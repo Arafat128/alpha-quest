@@ -154,10 +154,11 @@ export default function AdminPage() {
             });
             const json = await res.json();
             setMsg(res.ok ? `Created ${json.campaign.slug}` : json.error);
-            if (res.ok) {
+            if (res.ok && json.campaign) {
+              setCampaigns((prev) => [{ ...json.campaign, tasks: json.campaign.tasks || [] }, ...prev]);
+              setTaskCampaign(json.campaign.id);
               setTitle("");
               setDescription("");
-              load();
             }
           }}
           data-testid="create-campaign"
@@ -237,9 +238,13 @@ export default function AdminPage() {
             });
             const json = await res.json();
             setMsg(res.ok ? `Added ${json.task.title}` : json.error);
-            if (res.ok) {
+            if (res.ok && json.task) {
+              setCampaigns((prev) =>
+                prev.map((c) =>
+                  c.id === taskCampaign ? { ...c, tasks: [...(c.tasks || []), json.task] } : c
+                )
+              );
               setTaskTitle("");
-              load();
             }
           }}
         >

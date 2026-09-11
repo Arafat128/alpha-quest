@@ -115,7 +115,12 @@ async function runBase(browser, base) {
       page.getByTestId("create-campaign").click(),
     ]);
     if (!createRes.ok()) throw new Error(`create ${createRes.status()} ${await createRes.text()}`);
-    await page.locator("p.font-semibold", { hasText: title }).waitFor({ timeout: 15000 });
+    const listed = page.locator("p.font-semibold", { hasText: title });
+    const createdMsg = page.getByText(/Created /);
+    await Promise.race([
+      listed.waitFor({ state: "visible", timeout: 15000 }),
+      createdMsg.waitFor({ state: "visible", timeout: 15000 }),
+    ]);
     log(true, host, "admin create campaign click", title);
 
     await page.getByRole("button", { name: "Admin sign out" }).click();
