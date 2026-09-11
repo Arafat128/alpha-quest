@@ -3,7 +3,7 @@ import { getSession } from "@/lib/session";
 import { pkcePair, randomUrl } from "@/lib/pkce";
 
 export async function GET(req: Request) {
-  const id = process.env.X_CLIENT_ID;
+  const id = (process.env.X_CLIENT_ID || "").trim();
   const origin = new URL(req.url).origin;
   if (!id) {
     return NextResponse.redirect(new URL("/login?error=x_not_configured", req.url));
@@ -18,13 +18,15 @@ export async function GET(req: Request) {
   session.oauthIntent = intent;
   await session.save();
 
-  const url = new URL("https://twitter.com/i/oauth2/authorize");
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("client_id", id);
-  url.searchParams.set("redirect_uri", `${origin}/api/auth/x/callback`);
-  url.searchParams.set("scope", "users.read tweet.read offline.access");
-  url.searchParams.set("state", state);
-  url.searchParams.set("code_challenge", challenge);
-  url.searchParams.set("code_challenge_method", "S256");
-  return NextResponse.redirect(url);
+  const redirectUri = `${origin}/api/auth/x/callback`;
+  const authorize =
+    "https://x.com/i/oauth2/authorize" +
+    `?response_type=code` +
+    `&client_id=${encodeURIComponent(id)}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&scope=${encodeURIComponent("tweet.read users.read")}` +
+    `&state=${encodeURIComponent(state)}` +
+    `&code_challenge=${encodeURIComponent(challenge)}` +
+    `&code_challenge_method=S256`;
+  return NextResponse.redirect(authorize);
 }

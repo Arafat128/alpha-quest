@@ -14,18 +14,20 @@ export async function GET(req: Request) {
     return NextResponse.redirect(new URL("/login?error=x_denied", req.url));
   }
 
+  const clientId = (process.env.X_CLIENT_ID || "").trim();
+  const clientSecret = (process.env.X_CLIENT_SECRET || "").trim();
+  const redirectUri = `${origin}/api/auth/x/callback`;
   const tokenRes = await fetch("https://api.twitter.com/2/oauth2/token", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${Buffer.from(
-        `${process.env.X_CLIENT_ID}:${process.env.X_CLIENT_SECRET}`
-      ).toString("base64")}`,
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
     },
     body: new URLSearchParams({
       code,
       grant_type: "authorization_code",
-      redirect_uri: `${origin}/api/auth/x/callback`,
+      client_id: clientId,
+      redirect_uri: redirectUri,
       code_verifier: session.oauthVerifier,
     }),
   });
