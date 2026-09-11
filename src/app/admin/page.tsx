@@ -108,7 +108,10 @@ export default function AdminPage() {
       <div className="flex items-end justify-between">
         <div>
           <h1 className="display text-4xl">Admin</h1>
-          <p className="mt-2 text-slate-400">Create quests. Watch standings and sybil signals.</p>
+          <p className="mt-2 text-slate-400">
+            Create a campaign below, then add quests (tasks) to it. Open a player account from the
+            table to see standing, risk, and sybil flags.
+          </p>
         </div>
         <button
           className="btn-ghost"

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { awaitDb, prisma } from "@/lib/prisma";
 import { clientIp, getSession } from "@/lib/session";
 import { logAudit, recomputeRisk } from "@/lib/risk";
+import { decodeOAuthState } from "@/lib/oauth-state";
 
 export async function GET(req: Request) {
   try {
@@ -16,11 +17,11 @@ async function handleXCallback(req: Request) {
   await awaitDb();
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
-  const state = url.searchParams.get("state");
+  const packed = decodeOAuthState(url.searchParams.get("state"));
   const session = await getSession();
   const origin = url.origin;
 
-  if (!code || !state || state !== session.oauthState || !session.oauthVerifier) {
+  if (!code || !packed || !session.oauthVerifier) {
     return NextResponse.redirect(new URL("/login?error=x_denied", req.url));
   }
 
@@ -53,29 +54,31 @@ async function handleXCallback(req: Request) {
   if (!me.data) return NextResponse.redirect(new URL("/login?error=x_failed", req.url));
 
   const ip = clientIp(req);
-  const intent = session.oauthIntent || "login";
+  const intent = packed.intent || session.oauthIntent || "login";
+  const linkUserId = packed.uid || session.userId;
   session.oauthVerifier = undefined;
   session.oauthState = undefined;
   session.oauthIntent = undefined;
 
-  if (intent === "link" && session.userId) {
+  if (intent === "link" && linkUserId) {
     const taken = await prisma.user.findFirst({
-      where: { xUserId: me.data.id, NOT: { id: session.userId } },
+      where: { xUserId: me.data.id, NOT: { id: linkUserId } },
     });
     if (taken) {
       await logAudit({
-        userId: session.userId,
+        userId: linkUserId,
         type: "SYBIL_BLOCK",
         ip,
         detail: { reason: "x_already_linked", xUserId: me.data.id },
       });
-      await recomputeRisk(session.userId);
+      await recomputeRisk(linkUserId);
       return NextResponse.redirect(new URL("/account?error=x_taken", req.url));
     }
     await prisma.user.update({
-      where: { id: session.userId },
+      where: { id: linkUserId },
       data: { xUserId: me.data.id, xHandle: me.data.username },
     });
+    session.userId = linkUserId;
     await session.save();
     return NextResponse.redirect(new URL("/account?x=linked", req.url));
   }
@@ -102,5 +105,5 @@ async function handleXCallback(req: Request) {
   await session.save();
   await logAudit({ userId: user.id, type: "LOGIN", ip, detail: { provider: "x" } });
   await recomputeRisk(user.id);
-  return NextResponse.redirect(new URL("/", req.url));
+  return NextResponse.redirect(new URL("/account?x=linked", req.url));
 }

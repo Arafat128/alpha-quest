@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { awaitDb, prisma } from "@/lib/prisma";
 import { clientIp, getSession } from "@/lib/session";
 import { logAudit, recomputeRisk } from "@/lib/risk";
+import { decodeOAuthState } from "@/lib/oauth-state";
 
 export async function GET(req: Request) {
   try {
@@ -12,15 +13,22 @@ export async function GET(req: Request) {
   }
 }
 
+function discordName(me: { username?: string; global_name?: string | null }) {
+  return (me.global_name || me.username || "").trim() || null;
+}
+
 async function handleDiscordCallback(req: Request) {
   await awaitDb();
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
-  const state = url.searchParams.get("state");
+  const packed = decodeOAuthState(url.searchParams.get("state"));
   const session = await getSession();
   const origin = url.origin;
 
-  if (!code || !state || state !== session.oauthState) {
+  if (!code || !packed) {
+    return NextResponse.redirect(new URL("/login?error=discord_denied", req.url));
+  }
+  if (session.oauthVerifier && packed.n !== session.oauthVerifier) {
     return NextResponse.redirect(new URL("/login?error=discord_denied", req.url));
   }
 
@@ -43,32 +51,41 @@ async function handleDiscordCallback(req: Request) {
   const meRes = await fetch("https://discord.com/api/users/@me", {
     headers: { Authorization: `Bearer ${token.access_token}` },
   });
-  const me = (await meRes.json()) as { id?: string; username?: string };
+  const me = (await meRes.json()) as {
+    id?: string;
+    username?: string;
+    global_name?: string | null;
+  };
   if (!me.id) return NextResponse.redirect(new URL("/login?error=discord_failed", req.url));
 
   const ip = clientIp(req);
-  const intent = session.oauthIntent || "login";
+  const intent = packed.intent || session.oauthIntent || "login";
+  const linkUserId = packed.uid || session.userId;
+  session.oauthVerifier = undefined;
   session.oauthState = undefined;
   session.oauthIntent = undefined;
 
-  if (intent === "link" && session.userId) {
+  const name = discordName(me);
+
+  if (intent === "link" && linkUserId) {
     const taken = await prisma.user.findFirst({
-      where: { discordId: me.id, NOT: { id: session.userId } },
+      where: { discordId: me.id, NOT: { id: linkUserId } },
     });
     if (taken) {
       await logAudit({
-        userId: session.userId,
+        userId: linkUserId,
         type: "SYBIL_BLOCK",
         ip,
         detail: { reason: "discord_already_linked", discordId: me.id },
       });
-      await recomputeRisk(session.userId);
+      await recomputeRisk(linkUserId);
       return NextResponse.redirect(new URL("/account?error=discord_taken", req.url));
     }
     await prisma.user.update({
-      where: { id: session.userId },
-      data: { discordId: me.id, discordUsername: me.username || null },
+      where: { id: linkUserId },
+      data: { discordId: me.id, discordUsername: name },
     });
+    session.userId = linkUserId;
     await session.save();
     return NextResponse.redirect(new URL("/account?discord=linked", req.url));
   }
@@ -78,7 +95,7 @@ async function handleDiscordCallback(req: Request) {
     user = await prisma.user.create({
       data: {
         discordId: me.id,
-        discordUsername: me.username || null,
+        discordUsername: name,
         lastIp: ip,
         lastLoginAt: new Date(),
       },
@@ -87,7 +104,7 @@ async function handleDiscordCallback(req: Request) {
     user = await prisma.user.update({
       where: { id: user.id },
       data: {
-        discordUsername: me.username || user.discordUsername,
+        discordUsername: name || user.discordUsername,
         lastIp: ip,
         lastLoginAt: new Date(),
       },
@@ -99,5 +116,5 @@ async function handleDiscordCallback(req: Request) {
   await session.save();
   await logAudit({ userId: user.id, type: "LOGIN", ip, detail: { provider: "discord" } });
   await recomputeRisk(user.id);
-  return NextResponse.redirect(new URL("/", req.url));
+  return NextResponse.redirect(new URL("/account?discord=linked", req.url));
 }

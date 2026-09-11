@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { randomUrl } from "@/lib/pkce";
+import { encodeOAuthState } from "@/lib/oauth-state";
 
 export async function GET(req: Request) {
   const id = process.env.DISCORD_CLIENT_ID;
@@ -9,11 +10,17 @@ export async function GET(req: Request) {
   }
   const origin = new URL(req.url).origin;
   const intent = new URL(req.url).searchParams.get("intent") || "login";
-  const state = randomUrl(16);
+  const nonce = randomUrl(16);
   const session = await getSession();
-  session.oauthState = state;
+  session.oauthVerifier = nonce;
   session.oauthIntent = intent;
   await session.save();
+
+  const state = encodeOAuthState({
+    n: nonce,
+    intent,
+    uid: intent === "link" ? session.userId : undefined,
+  });
 
   const url = new URL("https://discord.com/api/oauth2/authorize");
   url.searchParams.set("client_id", id);

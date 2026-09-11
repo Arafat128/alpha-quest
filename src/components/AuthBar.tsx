@@ -3,15 +3,19 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-type Me = { displayName: string; xHandle: string | null; discordUsername: string | null };
+type Me = { displayName: string };
 
 export default function AuthBar() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
+  const [admin, setAdmin] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
-      .then((j) => setMe(j.user ?? null))
+      .then((j) => {
+        setMe(j.user ?? null);
+        setAdmin(Boolean(j.admin));
+      })
       .catch(() => setMe(null));
   }, []);
 
@@ -19,14 +23,26 @@ export default function AuthBar() {
 
   if (!me) {
     return (
-      <Link href="/login" className="btn-primary text-xs">
-        Log in
-      </Link>
+      <div className="flex items-center gap-3">
+        {admin && (
+          <Link href="/admin" className="text-xs text-slate-400 hover:text-white">
+            Admin
+          </Link>
+        )}
+        <Link href="/login" className="btn-primary text-xs">
+          Log in
+        </Link>
+      </div>
     );
   }
 
   return (
     <div className="flex items-center gap-3">
+      {admin && (
+        <Link href="/admin" className="text-xs text-slate-400 hover:text-white">
+          Admin
+        </Link>
+      )}
       <Link href="/account" className="text-xs text-sky-200">
         {me.displayName}
       </Link>

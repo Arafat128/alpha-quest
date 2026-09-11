@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { pkcePair, randomUrl } from "@/lib/pkce";
+import { pkcePair } from "@/lib/pkce";
+import { encodeOAuthState } from "@/lib/oauth-state";
 
 export async function GET(req: Request) {
   const id = (process.env.X_CLIENT_ID || "").trim();
@@ -11,12 +12,16 @@ export async function GET(req: Request) {
 
   const intent = new URL(req.url).searchParams.get("intent") || "login";
   const { verifier, challenge } = pkcePair();
-  const state = randomUrl(16);
   const session = await getSession();
   session.oauthVerifier = verifier;
-  session.oauthState = state;
   session.oauthIntent = intent;
   await session.save();
+
+  const state = encodeOAuthState({
+    n: verifier.slice(0, 24),
+    intent,
+    uid: intent === "link" ? session.userId : undefined,
+  });
 
   const redirectUri = `${origin}/api/auth/x/callback`;
   const authorize =

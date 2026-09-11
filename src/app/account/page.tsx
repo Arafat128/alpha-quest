@@ -11,6 +11,7 @@ type Me = {
   emailVerified: boolean;
   xHandle: string | null;
   discordUsername: string | null;
+  discordId: string | null;
   points: number;
 };
 
@@ -19,17 +20,26 @@ export default function AccountPage() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [info, setInfo] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
   async function load() {
     const res = await fetch("/api/auth/me");
     const json = await res.json();
     setMe(json.user);
     if (json.user?.email) setEmail(json.user.email);
+    setLoaded(true);
   }
 
   useEffect(() => {
     load();
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("discord") === "linked") setInfo("Discord connected.");
+    if (q.get("x") === "linked") setInfo("X connected.");
+    if (q.get("error") === "discord_taken") setInfo("That Discord account is already used on another player.");
+    if (q.get("error") === "x_taken") setInfo("That X account is already used on another player.");
   }, []);
+
+  if (!loaded) return <p className="text-slate-400">Loading…</p>;
 
   if (!me) {
     return (
@@ -43,6 +53,9 @@ export default function AccountPage() {
     );
   }
 
+  const discordLabel = me.discordUsername || me.discordId;
+  const discordConnected = Boolean(me.discordId || me.discordUsername);
+
   return (
     <div className="max-w-xl">
       <h1 className="display text-5xl">Account</h1>
@@ -53,13 +66,31 @@ export default function AccountPage() {
 
       <section className="glass mt-8 rounded-3xl p-6">
         <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Social</p>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <a className="btn-ghost" href="/api/auth/x?intent=link">
-            {me.xHandle ? `@${me.xHandle}` : "Link X"}
-          </a>
-          <a className="btn-ghost" href="/api/auth/discord?intent=link">
-            {me.discordUsername ? me.discordUsername : "Link Discord"}
-          </a>
+        <div className="mt-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-slate-300">X</span>
+            {me.xHandle ? (
+              <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-sm text-emerald-300">
+                Connected @{me.xHandle}
+              </span>
+            ) : (
+              <a className="btn-ghost text-xs" href="/api/auth/x?intent=link">
+                Link X
+              </a>
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-slate-300">Discord</span>
+            {discordConnected ? (
+              <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-sm text-emerald-300">
+                Connected {discordLabel}
+              </span>
+            ) : (
+              <a className="btn-ghost text-xs" href="/api/auth/discord?intent=link">
+                Link Discord
+              </a>
+            )}
+          </div>
         </div>
       </section>
 
