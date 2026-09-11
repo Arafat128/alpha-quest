@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export default function AdminUserPage({ params }: { params: { id: string } }) {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [notes, setNotes] = useState("");
   const [msg, setMsg] = useState("");
 
@@ -26,24 +26,27 @@ export default function AdminUserPage({ params }: { params: { id: string } }) {
       <Link href="/admin" className="text-sm text-sky-200">
         ← Admin
       </Link>
-      <h1 className="display mt-4 text-4xl">{data.displayName}</h1>
+      <h1 className="display mt-4 text-4xl">{String(data.displayName)}</h1>
       <p className="mt-2 text-sm text-slate-400">
-        Risk {data.riskScore} · {data.points} pts · created {new Date(data.createdAt).toLocaleString()}
+        Risk {String(data.riskScore)} · {String(data.points)} pts · created{" "}
+        {new Date(String(data.createdAt)).toLocaleString()}
       </p>
 
       <section className="glass mt-6 rounded-3xl p-6 text-sm">
-        <p>X: {data.xHandle ? `@${data.xHandle}` : "—"} ({data.xUserId || "no id"})</p>
-        <p className="mt-1">Discord: {data.discordUsername || "—"} ({data.discordId || "no id"})</p>
-        <p className="mt-1">Email: {data.email || "—"}</p>
-        <p className="mt-1 font-mono text-xs">Wallet: {data.walletAddress || "—"}</p>
-        <p className="mt-1 font-mono text-xs">Last IP: {data.lastIp || "—"}</p>
+        <p>X: {data.xHandle ? `@${data.xHandle}` : "—"} ({String(data.xUserId || "no id")})</p>
+        <p className="mt-1">Discord: {String(data.discordUsername || "—")} ({String(data.discordId || "no id")})</p>
+        <p className="mt-1">Email: {String(data.email || "—")}</p>
+        <p className="mt-1 font-mono text-xs">Wallet: {String(data.walletAddress || "—")}</p>
+        <p className="mt-1 font-mono text-xs">Last IP: {String(data.lastIp || "—")}</p>
       </section>
 
       <section className="mt-6">
         <h2 className="font-semibold">Sybil / suspicion flags</h2>
         <ul className="mt-3 space-y-2">
-          {(data.flags || []).length === 0 && <li className="text-slate-500">No flags</li>}
-          {(data.flags || []).map((f: { code: string; severity: string; label: string }) => (
+          {((data.flags as { code: string; severity: string; label: string }[]) || []).length === 0 && (
+            <li className="text-slate-500">No flags</li>
+          )}
+          {((data.flags as { code: string; severity: string; label: string }[]) || []).map((f) => (
             <li key={f.code} className="glass rounded-2xl px-4 py-3 text-sm">
               <span className={f.severity === "high" ? "text-rose-300" : "text-amber-200"}>
                 {f.severity}
@@ -57,7 +60,12 @@ export default function AdminUserPage({ params }: { params: { id: string } }) {
       <section className="mt-6">
         <h2 className="font-semibold">Completions</h2>
         <ul className="mt-3 space-y-2 text-sm text-slate-300">
-          {data.completions?.map((c: any) => (
+          {((data.completions as Array<{
+            id: string;
+            pointsAwarded: number;
+            verifiedAt: string;
+            task?: { title?: string; campaign?: { title?: string } };
+          }>) || []).map((c) => (
             <li key={c.id} className="glass rounded-2xl px-4 py-3">
               {c.task?.campaign?.title} / {c.task?.title} · {c.pointsAwarded} pts ·{" "}
               {new Date(c.verifiedAt).toLocaleString()}
@@ -69,7 +77,13 @@ export default function AdminUserPage({ params }: { params: { id: string } }) {
       <section className="mt-6">
         <h2 className="font-semibold">Audit</h2>
         <ul className="mt-3 max-h-80 space-y-1 overflow-auto text-xs text-slate-400">
-          {data.auditEvents?.map((e: any) => (
+          {((data.auditEvents as Array<{
+            id: string;
+            createdAt: string;
+            type: string;
+            ip?: string;
+            detail?: string;
+          }>) || []).map((e) => (
             <li key={e.id}>
               {new Date(e.createdAt).toLocaleString()} · {e.type} · {e.ip} · {e.detail}
             </li>

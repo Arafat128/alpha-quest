@@ -5,10 +5,15 @@ import HomeHero from "@/components/HomeHero";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const campaigns = await prisma.campaign.findMany({
-    include: { _count: { select: { tasks: true } } },
-    orderBy: { startsAt: "desc" },
-  });
+  let campaigns: Awaited<ReturnType<typeof prisma.campaign.findMany>> = [];
+  try {
+    campaigns = await prisma.campaign.findMany({
+      include: { _count: { select: { tasks: true } } },
+      orderBy: { startsAt: "desc" },
+    });
+  } catch {
+    campaigns = [];
+  }
 
   return (
     <div>
