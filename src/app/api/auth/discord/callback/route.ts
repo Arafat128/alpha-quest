@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { awaitDb, prisma } from "@/lib/prisma";
 import { clientIp, getSession } from "@/lib/session";
 import { logAudit, recomputeRisk } from "@/lib/risk";
 
@@ -13,6 +13,7 @@ export async function GET(req: Request) {
 }
 
 async function handleDiscordCallback(req: Request) {
+  await awaitDb();
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");

@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { awaitDb, prisma } from "@/lib/prisma";
 import HomeHero from "@/components/HomeHero";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
+  await awaitDb();
   let campaigns: Array<{
     id: string;
     slug: string;

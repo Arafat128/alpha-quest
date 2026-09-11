@@ -30,6 +30,7 @@ yarn-error.log*
 .env*.local
 prisma/*.db
 prisma/*.db-journal
+!prisma/data.db
 contracts/out
 contracts/cache
 

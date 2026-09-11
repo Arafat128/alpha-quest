@@ -1,6 +1,6 @@
 import { getIronSession, type IronSession, type SessionOptions } from "iron-session";
 import { cookies } from "next/headers";
-import { prisma } from "./prisma";
+import { awaitDb, prisma } from "./prisma";
 
 export type SessionData = {
   nonce?: string;
@@ -31,6 +31,7 @@ export async function getSession(): Promise<IronSession<SessionData>> {
 }
 
 export async function requireUser() {
+  await awaitDb();
   const session = await getSession();
   if (!session.userId) {
     return { session, user: null as null };
@@ -44,6 +45,7 @@ export async function requireUser() {
 }
 
 export async function requireAdmin() {
+  await awaitDb();
   const session = await getSession();
   return Boolean(session.admin);
 }

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { awaitDb, prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  await awaitDb();
   const campaigns = await prisma.campaign.findMany({
     include: { _count: { select: { tasks: true } } },
     orderBy: { startsAt: "desc" },
