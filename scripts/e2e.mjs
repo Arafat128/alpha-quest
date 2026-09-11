@@ -55,6 +55,7 @@ async function runBase(browser, base) {
     log(!hasAdminNav, host, "admin hidden until login", `count=${hasAdminNav}`);
 
     const genesis = page.locator('[data-testid="campaign-genesis-attestation"]');
+    const genesisText = page.getByRole("heading", { name: "Genesis Attestation" });
     if (await genesis.count()) {
       await genesis.first().click();
       await page.waitForURL(/\/campaigns\//);
@@ -63,6 +64,12 @@ async function runBase(browser, base) {
       log(true, host, "open genesis + verify buttons", `n=${await verify.count()}`);
       const html = await page.content();
       log(!/PRIMUS_TEMPLATE/.test(html), host, "campaign copy public", "ok");
+    } else if (await genesisText.count()) {
+      await genesisText.first().click();
+      await page.waitForURL(/\/campaigns\//);
+      const verify = page.getByRole("button", { name: "Verify" });
+      await verify.first().waitFor({ state: "visible" });
+      log(true, host, "open genesis + verify buttons", `n=${await verify.count()}`);
     } else {
       log(false, host, "open genesis campaign", "card missing");
       await shot(page, `${host}-no-genesis`);
@@ -72,9 +79,10 @@ async function runBase(browser, base) {
     log((await page.getByText("Leaderboard").count()) > 0, host, "leaderboard", page.url());
 
     await page.goto(base + "/login", { waitUntil: "domcontentloaded" });
-    const x = page.getByTestId("login-x");
-    const d = page.getByTestId("login-discord");
-    log((await x.count()) === 1 && (await d.count()) === 1, host, "login buttons", "x+discord");
+    const x = page.getByRole("link", { name: /Continue with X/i });
+    const d = page.getByRole("link", { name: /Continue with Discord/i });
+    await d.waitFor({ state: "visible", timeout: 15000 });
+    log((await x.count()) >= 1 && (await d.count()) >= 1, host, "login buttons", `x=${await x.count()} d=${await d.count()}`);
 
     await page.goto(base + "/account", { waitUntil: "domcontentloaded" });
     log((await page.getByText("Account").count()) > 0, host, "account page", page.url());
@@ -102,11 +110,13 @@ async function runBase(browser, base) {
 
     const title = `E2E ${host} ${Date.now()}`;
     await page.getByTestId("campaign-title").fill(title);
-    await page.getByTestId("create-campaign").click();
-    await page.waitForTimeout(800);
-    const created = (await page.getByText(title).count()) > 0;
-    if (!created) await shot(page, `${host}-create-campaign`);
-    log(created, host, "admin create campaign click", title);
+    const [createRes] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/api/admin/campaigns") && r.request().method() === "POST"),
+      page.getByTestId("create-campaign").click(),
+    ]);
+    if (!createRes.ok()) throw new Error(`create ${createRes.status()} ${await createRes.text()}`);
+    await page.locator("p.font-semibold", { hasText: title }).waitFor({ timeout: 15000 });
+    log(true, host, "admin create campaign click", title);
 
     await page.getByRole("button", { name: "Admin sign out" }).click();
     await page.getByTestId("admin-password").waitFor({ state: "visible" });

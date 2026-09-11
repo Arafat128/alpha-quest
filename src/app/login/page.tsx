@@ -53,6 +53,8 @@ function LoginInner() {
   );
 }
 
+export const dynamic = "force-dynamic";
+
 export default function LoginPage() {
   return (
     <Suspense fallback={<p className="text-slate-400">Loading…</p>}>
