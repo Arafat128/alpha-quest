@@ -39,7 +39,11 @@ export async function GET(
         title: task.title,
         description: task.description,
         points: task.points,
-        primusTemplateId: task.primusTemplateId,
+        primusTemplateId:
+          task.primusTemplateId ||
+          (task.type === "X_FOLLOW" ? process.env.PRIMUS_TEMPLATE_X_FOLLOW : null) ||
+          (task.type === "X_POST" ? process.env.PRIMUS_TEMPLATE_X_POST : null) ||
+          (task.type === "DISCORD_JOIN" ? process.env.PRIMUS_TEMPLATE_DISCORD_JOIN : null),
         config: {
           handle: config.handle,
           mention: config.mention,

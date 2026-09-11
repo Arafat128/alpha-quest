@@ -3,6 +3,24 @@
 import { useState } from "react";
 import type { PrimusRequest, ResponseResolve } from "@/lib/task-config";
 
+type PrimusCtor = new () => {
+  init: (appId: string, appSecret?: string) => Promise<unknown>;
+  generateRequestParams: (templateId: string, userAddress?: string) => {
+    setAdditionParams: (v: string) => void;
+    setAttMode: (v: { algorithmType: string }) => void;
+    toJsonString: () => string;
+  };
+  startAttestation: (signed: string) => Promise<unknown>;
+  verifyAttestation?: (attestation: unknown) => Promise<boolean> | boolean;
+};
+
+declare global {
+  interface Window {
+    PrimusZKTLS?: PrimusCtor;
+    VoiceSenseZKTLS?: PrimusCtor;
+  }
+}
+
 type Props = {
   taskId: string;
   type: string;
@@ -21,7 +39,23 @@ type Props = {
   onDone?: () => void;
 };
 
-export default function VerifyButton({ taskId, type, status, config, onDone }: Props) {
+function errorText(err: unknown) {
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === "string" && err) return err;
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return "Verify failed";
+  }
+}
+
+export default function VerifyButton({
+  taskId,
+  type,
+  status,
+  primusTemplateId,
+  onDone,
+}: Props) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -51,24 +85,21 @@ export default function VerifyButton({ taskId, type, status, config, onDone }: P
 
       const appId = process.env.NEXT_PUBLIC_PRIMUS_APP_ID;
       if (!appId) throw new Error("Verification is not available right now.");
-      if (!config.request || !config.responseResolves?.length) {
-        throw new Error("This task is not ready to verify yet.");
+      if (!primusTemplateId) {
+        throw new Error("This quest has no Primus template yet. Ask an admin to set one.");
       }
 
-      const { PrimusPageCoreTLS } = await import("@primuslabs/zktls-page-core-sdk");
-      const zk = new PrimusPageCoreTLS();
-      await zk.init(appId);
+      const Ctor = window.PrimusZKTLS || window.VoiceSenseZKTLS;
+      if (typeof Ctor !== "function") {
+        throw new Error(
+          "Primus SDK did not load. Install the Primus Chrome extension, then refresh."
+        );
+      }
 
-      const request = zk.generateRequestParams(
-        {
-          url: config.request.url,
-          method: config.request.method || "GET",
-          header: config.request.header || {},
-          body: config.request.body || "",
-        },
-        config.responseResolves,
-        me.user.boundAddress || undefined
-      );
+      setMsg("Opening Primus extension… keep the popup in front and stay logged into X.");
+      const zk = new Ctor();
+      await zk.init(appId);
+      const request = zk.generateRequestParams(primusTemplateId, me.user.boundAddress);
       request.setAdditionParams(JSON.stringify({ taskId, userId: me.user.id }));
       request.setAttMode({ algorithmType: "proxytls" });
 
@@ -81,8 +112,8 @@ export default function VerifyButton({ taskId, type, status, config, onDone }: P
       const signedJson = await signedRes.json();
       if (!signedRes.ok) throw new Error(signedJson.error || "Server sign failed");
 
-      setMsg("Generating zkTLS proof — stay logged into X in this browser…");
       const attestation = await zk.startAttestation(signedJson.signResult);
+      if (!attestation) throw new Error("Primus returned an empty proof");
 
       const verifyRes = await fetch(`/api/tasks/${taskId}/verify`, {
         method: "POST",
@@ -91,9 +122,10 @@ export default function VerifyButton({ taskId, type, status, config, onDone }: P
       });
       const verifyJson = await verifyRes.json();
       if (!verifyRes.ok) throw new Error(verifyJson.error || "Backend rejected proof");
+      setMsg("");
       onDone?.();
     } catch (err) {
-      setMsg(err instanceof Error ? err.message : "Verify failed");
+      setMsg(errorText(err));
     } finally {
       setBusy(false);
     }

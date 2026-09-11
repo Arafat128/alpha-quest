@@ -20,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={`${geistSans.variable} antialiased text-slate-100`}>
+        <Script src="/zktls-bundle.js" strategy="beforeInteractive" />
         <Script src="/primus_zk.js" strategy="beforeInteractive" />
         <Script src="/client_plugin.js" strategy="beforeInteractive" />
         <Providers>
