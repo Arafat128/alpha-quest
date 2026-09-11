@@ -4,6 +4,15 @@ import { clientIp, getSession } from "@/lib/session";
 import { logAudit, recomputeRisk } from "@/lib/risk";
 
 export async function GET(req: Request) {
+  try {
+    return await handleDiscordCallback(req);
+  } catch (error) {
+    console.error("discord callback", error);
+    return NextResponse.redirect(new URL("/login?error=discord_failed", req.url));
+  }
+}
+
+async function handleDiscordCallback(req: Request) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
