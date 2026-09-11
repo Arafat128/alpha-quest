@@ -39,6 +39,25 @@ type Props = {
   onDone?: () => void;
 };
 
+function waitForPrimus(ms: number) {
+  return new Promise<PrimusCtor | undefined>((resolve) => {
+    const start = Date.now();
+    const tick = () => {
+      const Ctor = window.PrimusZKTLS || window.VoiceSenseZKTLS;
+      if (typeof Ctor === "function") {
+        resolve(Ctor);
+        return;
+      }
+      if (Date.now() - start >= ms) {
+        resolve(undefined);
+        return;
+      }
+      setTimeout(tick, 150);
+    };
+    tick();
+  });
+}
+
 function errorText(err: unknown) {
   if (err instanceof Error && err.message) return err.message;
   if (typeof err === "string" && err) return err;
@@ -89,7 +108,7 @@ export default function VerifyButton({
         throw new Error("This quest has no Primus template yet. Ask an admin to set one.");
       }
 
-      const Ctor = window.PrimusZKTLS || window.VoiceSenseZKTLS;
+      const Ctor = await waitForPrimus(8000);
       if (typeof Ctor !== "function") {
         throw new Error(
           "Primus SDK did not load. Install the Primus Chrome extension, then refresh."
@@ -133,7 +152,7 @@ export default function VerifyButton({
 
   return (
     <div className="flex flex-col items-end gap-2">
-      <button className="btn-primary" disabled={busy} onClick={run}>
+      <button className="btn-primary" data-testid="verify-btn" disabled={busy} onClick={run}>
         {busy ? "Proving…" : "Verify"}
       </button>
       {msg && <p className="max-w-xs text-right text-xs text-slate-400">{msg}</p>}

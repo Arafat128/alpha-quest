@@ -43,9 +43,11 @@ const xPostConfig = {
 };
 
 async function main() {
-  await prisma.taskCompletion.deleteMany();
-  await prisma.task.deleteMany();
-  await prisma.campaign.deleteMany();
+  const existing = await prisma.campaign.findUnique({ where: { slug: "genesis-attestation" } });
+  if (existing) {
+    console.log("Genesis campaign already exists", existing.id);
+    return;
+  }
 
   const campaign = await prisma.campaign.create({
     data: {

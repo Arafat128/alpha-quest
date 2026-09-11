@@ -39,6 +39,7 @@ export default async function HomePage() {
           <Link
             key={c.id}
             href={`/campaigns/${c.slug}`}
+            data-testid={`campaign-${c.slug}`}
             className="glass hairline group rounded-3xl p-7 transition hover:-translate-y-0.5"
           >
             <p className="text-xs uppercase tracking-[0.18em] text-sky-300/80">

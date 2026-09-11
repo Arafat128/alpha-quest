@@ -84,17 +84,17 @@ export default function AdminPage() {
             }
           }}
         >
-          <input type="text" name="username" autoComplete="username" className="hidden" tabIndex={-1} readOnly />
           <input
             key={gateKey}
             type="password"
             name={`admin_gate_${gateKey}`}
             autoComplete="new-password"
             className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2"
+            data-testid="admin-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          <button className="btn-primary mt-4" type="submit">
+          <button className="btn-primary mt-4" type="submit" data-testid="admin-enter">
             Enter
           </button>
         </form>
@@ -133,6 +133,7 @@ export default function AdminPage() {
           <input
             className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
             placeholder="Title"
+            data-testid="campaign-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
@@ -159,6 +160,7 @@ export default function AdminPage() {
               load();
             }
           }}
+          data-testid="create-campaign"
         >
           Create campaign
         </button>

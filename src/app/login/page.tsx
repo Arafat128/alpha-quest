@@ -42,10 +42,10 @@ function LoginInner() {
         </p>
       )}
       <div className="mt-8 flex flex-col gap-3">
-        <a className="btn-primary justify-center py-3" href="/api/auth/x">
+        <a className="btn-primary justify-center py-3" data-testid="login-x" href="/api/auth/x">
           Continue with X
         </a>
-        <a className="btn-ghost justify-center py-3" href="/api/auth/discord">
+        <a className="btn-ghost justify-center py-3" data-testid="login-discord" href="/api/auth/discord">
           Continue with Discord
         </a>
       </div>

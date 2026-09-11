@@ -36,6 +36,8 @@ contracts/cache
 
 # vercel
 .vercel
+test-results
+/test-results
 
 # typescript
 *.tsbuildinfo
