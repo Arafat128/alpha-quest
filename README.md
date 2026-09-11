@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Alpha Quest
 
-## Getting Started
+Galxe-style campaigns where **X tasks are proven with Primus zkTLS**, not a checkbox. Wallet (SIWE) is the primary account. Completions hash the proven social identity so one X/Discord user cannot farm multiple wallets.
 
-First, run the development server:
+Visual: liquid glass / dark editorial. Stack: Next.js 14 App Router, TypeScript, Tailwind, Prisma (SQLite locally / Postgres in prod), wagmi/viem, Foundry stub for v2 on-chain verify.
+
+## Run locally
 
 ```bash
+cd primus-quest-platform
+cp .env.example .env
+# fill PRIMUS_APP_ID / PRIMUS_APP_SECRET from https://dev.primuslabs.xyz
+npx prisma generate
+npx prisma db push
+npm run db:seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Log in with **X** or **Discord** (no wallet required).
+2. Open **Genesis Attestation**.
+3. Stay logged into x.com in the same browser, then **Verify** on the follow task.
+4. Admins: `/admin` with `ADMIN_SECRET` to create campaigns/quests and inspect user risk / sybil flags.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Primus notes
 
-## Learn More
+- SDK: `@primuslabs/zktls-page-core-sdk` (no Chrome extension). WASM/worker files live in `/public`.
+- Production pattern: `init(appId)` in the browser, `POST /api/primus/sign` on the server.
+- Headers `COOP: same-origin` and `COEP: require-corp` are set for SharedArrayBuffer.
+- Hub **template IDs** are stored on tasks for matching; Page Core still needs `request` + `responseResolves` in task `config` JSON. Point parsePath at `relationship_perspectives.following`, not `relationship_counts.following`.
+- Optional: `PRIMUS_VERIFIER_ADDRESS` + `RPC_URL` for on-chain `verifyAttestation`.
 
-To learn more about Next.js, take a look at the following resources:
+## Discord
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Hybrid (spec option B): if `DISCORD_BOT_TOKEN` and a linked Discord user exist, join/role tasks use Discord’s API. Otherwise submit a Primus attestation the same way as X.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Security
 
-## Deploy on Vercel
+Never mark a task complete because the client said so. Binding: wallet session + `additionParams.userId/taskId` + `@@unique([taskId, provenIdentityHash])`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Do not commit `.env`.

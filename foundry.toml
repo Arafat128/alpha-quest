@@ -1,0 +1,5 @@
+[profile.default]
+src = "contracts/src"
+out = "contracts/out"
+libs = ["contracts/lib"]
+solc = "0.8.20"

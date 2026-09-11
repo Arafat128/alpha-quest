@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  walletAddress   String?   @unique
+  email           String?   @unique
+  emailVerifiedAt DateTime?
+  xHandle         String?
+  xUserId         String?   @unique
+  discordId       String?   @unique
+  discordUsername String?
+  lastIp          String?
+  lastLoginAt     DateTime?
+  riskScore       Int       @default(0)
+  notes           String    @default("")
+  createdAt       DateTime  @default(now())
+  completions     TaskCompletion[]
+  auditEvents     AuditEvent[]
+}
+
+model Campaign {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  description String
+  accent      String    @default("#38bdf8")
+  startsAt    DateTime
+  endsAt      DateTime?
+  tasks       Task[]
+}
+
+model Task {
+  id               String   @id @default(cuid())
+  campaignId       String
+  campaign         Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  /// X_FOLLOW | X_POST | DISCORD_JOIN | DISCORD_ROLE | EMAIL_VERIFY
+  type             String
+  title            String
+  description      String
+  primusTemplateId String?
+  config           String
+  points           Int
+  sortOrder        Int      @default(0)
+  completions      TaskCompletion[]
+}
+
+model TaskCompletion {
+  id                 String   @id @default(cuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId             String
+  task               Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  attestationHash    String
+  provenIdentityHash String
+  verifiedAt         DateTime @default(now())
+  pointsAwarded      Int
+
+  @@unique([userId, taskId])
+  @@unique([taskId, provenIdentityHash])
+}
+
+model EmailOtp {
+  id        String   @id @default(cuid())
+  email     String
+  codeHash  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model RateLimit {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  count     Int      @default(0)
+  windowEnd DateTime
+}
+
+model AuditEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type      String
+  ip        String?
+  detail    String   @default("")
+  createdAt DateTime @default(now())
+}
