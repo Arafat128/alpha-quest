@@ -176,7 +176,14 @@ export default function VerifyButton({
         request.setAdditionParams(JSON.stringify({ taskId, userId: me.user.id, handle: config.handle }));
         request.setAttMode({ algorithmType: "proxytls" });
         unsigned = request.toJsonString();
-        startAttestation = (signed) => zk.startAttestation(signed);
+        const Ctor = await waitForPrimus(4000);
+        if (typeof Ctor === "function") {
+          const ext = new Ctor();
+          await ext.init(appId);
+          startAttestation = (signed) => ext.startAttestation(signed);
+        } else {
+          startAttestation = (signed) => zk.startAttestation(signed);
+        }
       }
 
       const signedRes = await fetch("/api/primus/sign", {
