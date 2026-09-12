@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Alpha Quest · Primus proof</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background:#07070c; color:#eef2ff; max-width: 560px; margin: 3rem auto; padding: 0 1rem; }
+    .card { background: rgba(16,18,32,.7); border: 1px solid rgba(226,232,240,.12); border-radius: 20px; padding: 1.5rem; }
+    h1 { font-size: 1.35rem; margin: .3rem 0 1rem; }
+    .muted { color:#94a3b8; font-size:.95rem; line-height:1.5; }
+    button { margin-top: 1rem; background: linear-gradient(135deg,#0ea5e9,#6366f1); color:#fff; border:0; border-radius:12px; padding:.75rem 1.1rem; font-weight:600; cursor:pointer; }
+    button:disabled { opacity:.4; cursor:not-allowed; }
+    .ok { color:#6ee7b7; margin-top:1rem; }
+    .err { color:#fca5a5; margin-top:1rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <p class="muted">Primus extension</p>
+    <h1 id="title">Prove follow</h1>
+    <p class="muted" id="hint">Stay logged into X. Click Start proof, then keep the orange Primus popup in front until it finishes.</p>
+    <div id="status"></div>
+    <button id="prove" disabled>Start proof</button>
+  </div>
+  <script src="/zktls-bundle.js"></script>
+  <script>
+    const q = new URLSearchParams(location.search);
+    const taskId = q.get("task") || "";
+    const templateId = q.get("template") || "";
+    const handle = (q.get("handle") || "").replace(/^@/, "");
+    const statusEl = document.getElementById("status");
+    const btn = document.getElementById("prove");
+    const titleEl = document.getElementById("title");
+    if (handle) titleEl.textContent = "Prove you follow @" + handle;
+
+    function show(msg, kind) {
+      statusEl.innerHTML = msg ? '<p class="' + (kind || "") + '">' + msg + "</p>" : "";
+    }
+
+    (async function ready() {
+      try {
+        const me = await fetch("/api/auth/me", { credentials: "include" }).then((r) => r.json());
+        if (!me.user) {
+          show("Log in on Alpha Quest first, then open this page again.", "err");
+          return;
+        }
+        if (!templateId) {
+          show("This quest has no Primus Hub template. In Admin, paste a template ID created on x.com/" + (handle || "the-account") + ".", "err");
+          return;
+        }
+        if (typeof window.PrimusZKTLS !== "function" && typeof window.VoiceSenseZKTLS !== "function") {
+          show("Primus SDK missing. Refresh, and make sure the Primus extension is installed.", "err");
+          return;
+        }
+        btn.disabled = false;
+        btn.onclick = function () { run(me.user); };
+      } catch (e) {
+        show(String(e && e.message || e), "err");
+      }
+    })();
+
+    async function run(user) {
+      btn.disabled = true;
+      show("Opening Primus extension… keep the popup in front.", "ok");
+      try {
+        const cfg = await fetch("/api/primus/config", { credentials: "include" }).then((r) => r.json());
+        if (!cfg.appId) throw new Error("Primus app is not configured");
+        const Ctor = window.PrimusZKTLS || window.VoiceSenseZKTLS;
+        const zk = new Ctor();
+        await zk.init(cfg.appId);
+        const request = zk.generateRequestParams(templateId, user.boundAddress);
+        request.setAdditionParams(JSON.stringify({ taskId: taskId, userId: user.id, handle: handle }));
+        request.setAttMode({ algorithmType: "proxytls" });
+        const unsigned = request.toJsonString();
+        const signedRes = await fetch("/api/primus/sign", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ signParams: unsigned }),
+        });
+        const signedJson = await signedRes.json();
+        if (!signedRes.ok) throw new Error(signedJson.error || "Sign failed");
+        const attestation = await zk.startAttestation(signedJson.signResult);
+        if (!attestation) throw new Error("Empty proof");
+        const verifyRes = await fetch("/api/tasks/" + encodeURIComponent(taskId) + "/verify", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ attestation: attestation }),
+        });
+        const verifyJson = await verifyRes.json();
+        if (!verifyRes.ok) throw new Error(verifyJson.error || "Quest rejected the proof");
+        show("Verified. You can close this tab and return to Alpha Quest.", "ok");
+        try {
+          if (window.opener && !window.opener.closed) window.opener.focus();
+        } catch (e) {}
+      } catch (e) {
+        show((e && e.message) || String(e), "err");
+        btn.disabled = false;
+        btn.textContent = "Try again";
+      }
+    }
+  </script>
+</body>
+</html>

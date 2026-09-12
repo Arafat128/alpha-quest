@@ -64,13 +64,11 @@ export async function POST(
       title,
       description: (body.description || "").trim() || title,
       points: Math.max(1, Number(body.points) || 50),
-      primusTemplateId:
-        body.primusTemplateId ||
+      primusTemplateId: (body.primusTemplateId || "").trim() ||
         (type === "X_FOLLOW" && handle.toLowerCase() === "example_owner"
-          ? process.env.PRIMUS_TEMPLATE_X_FOLLOW
+          ? process.env.PRIMUS_TEMPLATE_X_FOLLOW || null
           : null) ||
-        (type === "X_POST" ? process.env.PRIMUS_TEMPLATE_X_POST : null) ||
-        null,
+        (type === "X_POST" ? process.env.PRIMUS_TEMPLATE_X_POST || null : null),
       config: JSON.stringify(config),
       sortOrder: (last?.sortOrder || 0) + 1,
     },

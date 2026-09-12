@@ -40,17 +40,14 @@ export async function GET(
         description: task.description,
         points: task.points,
         primusTemplateId: (() => {
+          if (task.primusTemplateId) return task.primusTemplateId;
           const handle = (config.handle || "").replace(/^@/, "").toLowerCase();
-          if (task.type === "X_FOLLOW" && handle && handle !== "example_owner") {
-            return null;
+          if (task.type === "X_FOLLOW" && handle === "example_owner") {
+            return process.env.PRIMUS_TEMPLATE_X_FOLLOW || null;
           }
-          return (
-            task.primusTemplateId ||
-            (task.type === "X_FOLLOW" ? process.env.PRIMUS_TEMPLATE_X_FOLLOW : null) ||
-            (task.type === "X_POST" ? process.env.PRIMUS_TEMPLATE_X_POST : null) ||
-            (task.type === "DISCORD_JOIN" ? process.env.PRIMUS_TEMPLATE_DISCORD_JOIN : null) ||
-            null
-          );
+          if (task.type === "X_POST") return process.env.PRIMUS_TEMPLATE_X_POST || null;
+          if (task.type === "DISCORD_JOIN") return process.env.PRIMUS_TEMPLATE_DISCORD_JOIN || null;
+          return null;
         })(),
         config: {
           handle: config.handle,

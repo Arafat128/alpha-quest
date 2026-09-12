@@ -38,6 +38,7 @@ export default function AdminPage() {
   const [taskPoints, setTaskPoints] = useState(100);
   const [handle, setHandle] = useState("");
   const [guildId, setGuildId] = useState("");
+  const [primusTemplateId, setPrimusTemplateId] = useState("");
   const [msg, setMsg] = useState("");
   const [taskBusy, setTaskBusy] = useState(false);
 
@@ -206,12 +207,20 @@ export default function AdminPage() {
             onChange={(e) => setTaskPoints(Number(e.target.value))}
           />
           {taskType === "X_FOLLOW" && (
-            <input
-              className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
-              placeholder="X handle to follow (e.g. example_user)"
-              value={handle}
-              onChange={(e) => setHandle(e.target.value)}
-            />
+            <>
+              <input
+                className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
+                placeholder="X handle to follow (e.g. example_user)"
+                value={handle}
+                onChange={(e) => setHandle(e.target.value)}
+              />
+              <input
+                className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm md:col-span-2"
+                placeholder="Primus Hub template ID for that X account (required for the extension)"
+                value={primusTemplateId}
+                onChange={(e) => setPrimusTemplateId(e.target.value)}
+              />
+            </>
           )}
           {(taskType === "DISCORD_JOIN" || taskType === "DISCORD_ROLE") && (
             <input
@@ -242,6 +251,7 @@ export default function AdminPage() {
                   points: taskPoints,
                   handle,
                   guildId,
+                  primusTemplateId,
                 }),
               });
               const json = await res.json();
