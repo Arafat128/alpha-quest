@@ -156,7 +156,15 @@ export default function AccountPage() {
           )}
         </div>
       </section>
-      {info && <p className="mt-4 text-sm text-sky-200">{info}</p>}
+      {info && (
+        <p
+          className={`mt-4 text-sm ${
+            info.toLowerCase().includes("already") ? "text-amber-300" : "text-sky-200"
+          }`}
+        >
+          {info}
+        </p>
+      )}
     </div>
   );
 }

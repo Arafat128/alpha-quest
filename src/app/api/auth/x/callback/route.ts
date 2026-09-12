@@ -3,6 +3,7 @@ import { awaitDb, prisma } from "@/lib/prisma";
 import { clientIp, getSession } from "@/lib/session";
 import { logAudit, recomputeRisk } from "@/lib/risk";
 import { decodeOAuthState } from "@/lib/oauth-state";
+import { SocialTakenError, attachX } from "@/lib/merge-social";
 
 export async function GET(req: Request) {
   try {
@@ -61,25 +62,24 @@ async function handleXCallback(req: Request) {
   session.oauthIntent = undefined;
 
   if (intent === "link" && linkUserId) {
-    const taken = await prisma.user.findFirst({
-      where: { xUserId: me.data.id, NOT: { id: linkUserId } },
-    });
-    if (taken) {
-      await logAudit({
-        userId: linkUserId,
-        type: "SYBIL_BLOCK",
-        ip,
-        detail: { reason: "x_already_linked", xUserId: me.data.id },
-      });
-      await recomputeRisk(linkUserId);
-      return NextResponse.redirect(new URL("/account?error=x_taken", req.url));
+    try {
+      await attachX(linkUserId, me.data.id, me.data.username);
+    } catch (error) {
+      if (error instanceof SocialTakenError) {
+        await logAudit({
+          userId: linkUserId,
+          type: "SYBIL_BLOCK",
+          ip,
+          detail: { reason: "x_already_linked", xUserId: me.data.id },
+        });
+        await recomputeRisk(linkUserId);
+        return NextResponse.redirect(new URL("/account?error=x_taken", req.url));
+      }
+      throw error;
     }
-    await prisma.user.update({
-      where: { id: linkUserId },
-      data: { xUserId: me.data.id, xHandle: me.data.username },
-    });
     session.userId = linkUserId;
     await session.save();
+    await recomputeRisk(linkUserId);
     return NextResponse.redirect(new URL("/account?x=linked", req.url));
   }
 

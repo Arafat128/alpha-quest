@@ -3,6 +3,7 @@ import { awaitDb, prisma } from "@/lib/prisma";
 import { clientIp, getSession } from "@/lib/session";
 import { logAudit, recomputeRisk } from "@/lib/risk";
 import { decodeOAuthState } from "@/lib/oauth-state";
+import { SocialTakenError, attachDiscord } from "@/lib/merge-social";
 
 export async function GET(req: Request) {
   try {
@@ -68,25 +69,24 @@ async function handleDiscordCallback(req: Request) {
   const name = discordName(me);
 
   if (intent === "link" && linkUserId) {
-    const taken = await prisma.user.findFirst({
-      where: { discordId: me.id, NOT: { id: linkUserId } },
-    });
-    if (taken) {
-      await logAudit({
-        userId: linkUserId,
-        type: "SYBIL_BLOCK",
-        ip,
-        detail: { reason: "discord_already_linked", discordId: me.id },
-      });
-      await recomputeRisk(linkUserId);
-      return NextResponse.redirect(new URL("/account?error=discord_taken", req.url));
+    try {
+      await attachDiscord(linkUserId, me.id, name);
+    } catch (error) {
+      if (error instanceof SocialTakenError) {
+        await logAudit({
+          userId: linkUserId,
+          type: "SYBIL_BLOCK",
+          ip,
+          detail: { reason: "discord_already_linked", discordId: me.id },
+        });
+        await recomputeRisk(linkUserId);
+        return NextResponse.redirect(new URL("/account?error=discord_taken", req.url));
+      }
+      throw error;
     }
-    await prisma.user.update({
-      where: { id: linkUserId },
-      data: { discordId: me.id, discordUsername: name },
-    });
     session.userId = linkUserId;
     await session.save();
+    await recomputeRisk(linkUserId);
     return NextResponse.redirect(new URL("/account?discord=linked", req.url));
   }
 
