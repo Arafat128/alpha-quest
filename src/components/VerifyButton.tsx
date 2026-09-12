@@ -73,6 +73,7 @@ export default function VerifyButton({
   type,
   status,
   primusTemplateId,
+  config,
   onDone,
 }: Props) {
   const [busy, setBusy] = useState(false);
