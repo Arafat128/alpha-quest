@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
-import { defaultXFollowConfig } from "@/lib/task-config";
+import { defaultXFollowConfig, defaultTemplateForTask } from "@/lib/task-config";
+
+export const dynamic = "force-dynamic";
 
 const TYPES = ["X_FOLLOW", "X_POST", "DISCORD_JOIN", "DISCORD_ROLE", "EMAIL_VERIFY"];
 
@@ -64,11 +66,7 @@ export async function POST(
       title,
       description: (body.description || "").trim() || title,
       points: Math.max(1, Number(body.points) || 50),
-      primusTemplateId: (body.primusTemplateId || "").trim() ||
-        (type === "X_FOLLOW" && handle.toLowerCase() === "example_owner"
-          ? process.env.PRIMUS_TEMPLATE_X_FOLLOW || null
-          : null) ||
-        (type === "X_POST" ? process.env.PRIMUS_TEMPLATE_X_POST || null : null),
+      primusTemplateId: defaultTemplateForTask(type, body.primusTemplateId),
       config: JSON.stringify(config),
       sortOrder: (last?.sortOrder || 0) + 1,
     },

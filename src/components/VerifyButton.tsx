@@ -84,19 +84,14 @@ export default function VerifyButton({
         return;
       }
 
-      if (!primusTemplateId) {
-        throw new Error(
-          `The Primus extension needs a Hub template for @${config.handle || "this account"}. ` +
-            `Open x.com/${config.handle || ""} logged in, create a UserByScreenName template ` +
-            `(select screen_name and relationship_perspectives.following), then paste the template ID on the Admin task.`
-        );
-      }
-
       const prove = new URL("/prove.html", window.location.origin);
       prove.searchParams.set("task", taskId);
-      prove.searchParams.set("template", primusTemplateId);
+      if (primusTemplateId) prove.searchParams.set("template", primusTemplateId);
       prove.searchParams.set("handle", config.handle || "");
-      window.open(prove.toString(), "alpha-quest-prove", "popup=yes,width=540,height=760");
+      const popup = window.open(prove.toString(), "alpha-quest-prove", "popup=yes,width=540,height=760");
+      if (!popup) {
+        throw new Error("Allow popups for Alpha Quest so the Primus extension can open.");
+      }
       setMsg("Complete the Primus popup in the new tab. This page will update when it succeeds.");
 
       for (let i = 0; i < 90; i++) {

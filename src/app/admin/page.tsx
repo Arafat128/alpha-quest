@@ -217,13 +217,13 @@ export default function AdminPage() {
             <>
               <input
                 className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
-                placeholder="X handle to follow (e.g. example_user)"
+                placeholder="X handle to follow (any username, e.g. example_user)"
                 value={handle}
                 onChange={(e) => setHandle(e.target.value)}
               />
               <input
                 className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm md:col-span-2"
-                placeholder="Primus Hub template ID for that X account (required for the extension)"
+                placeholder="Optional: override Primus template ID (leave blank — one template works for every X handle)"
                 value={primusTemplateId}
                 onChange={(e) => setPrimusTemplateId(e.target.value)}
               />
@@ -389,7 +389,7 @@ function TaskTemplateField({
     <div className="mt-2">
       <input
         className="w-full rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-xs"
-        placeholder="Paste Primus Hub template ID for this X account"
+        placeholder="Optional template override (blank uses the shared follow template)"
         value={value}
         onChange={(e) => setValue(e.target.value)}
       />

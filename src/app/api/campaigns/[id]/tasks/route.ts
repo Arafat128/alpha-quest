@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
-import { parseTaskConfig } from "@/lib/task-config";
+import { parseTaskConfig, defaultTemplateForTask } from "@/lib/task-config";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(
   _req: Request,
@@ -39,16 +41,7 @@ export async function GET(
         title: task.title,
         description: task.description,
         points: task.points,
-        primusTemplateId: (() => {
-          if (task.primusTemplateId) return task.primusTemplateId;
-          const handle = (config.handle || "").replace(/^@/, "").toLowerCase();
-          if (task.type === "X_FOLLOW" && handle === "example_owner") {
-            return process.env.PRIMUS_TEMPLATE_X_FOLLOW || null;
-          }
-          if (task.type === "X_POST") return process.env.PRIMUS_TEMPLATE_X_POST || null;
-          if (task.type === "DISCORD_JOIN") return process.env.PRIMUS_TEMPLATE_DISCORD_JOIN || null;
-          return null;
-        })(),
+        primusTemplateId: defaultTemplateForTask(task.type, task.primusTemplateId),
         config: {
           handle: config.handle,
           mention: config.mention,

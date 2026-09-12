@@ -27,16 +27,63 @@
   <script>
     const q = new URLSearchParams(location.search);
     const taskId = q.get("task") || "";
-    const templateId = q.get("template") || "";
-    const handle = (q.get("handle") || "").replace(/^@/, "");
+    let templateId = q.get("template") || "";
+    let handle = (q.get("handle") || "").replace(/^@/, "");
     const statusEl = document.getElementById("status");
     const btn = document.getElementById("prove");
     const titleEl = document.getElementById("title");
-    if (handle) titleEl.textContent = "Prove you follow @" + handle;
+    const hintEl = document.getElementById("hint");
+    let proveCfg = null;
+    let submitted = false;
 
     function show(msg, kind) {
       statusEl.innerHTML = msg ? '<p class="' + (kind || "") + '">' + msg + "</p>" : "";
     }
+
+    function userByScreenNameUrl(screen) {
+      return "https://x.com/i/api/graphql/Gb-d6r0vxPOADdG62OEBpQ/UserByScreenName?variables=" +
+        encodeURIComponent(JSON.stringify({ screen_name: screen, withGrokTranslatedBio: false }));
+    }
+
+    function swapScreenNameInUrl(url, screen) {
+      try {
+        const parsed = new URL(url);
+        const raw = parsed.searchParams.get("variables");
+        if (raw) {
+          const variables = JSON.parse(raw);
+          variables.screen_name = screen;
+          parsed.searchParams.set("variables", JSON.stringify(variables));
+          return parsed.toString();
+        }
+      } catch (e) {}
+      return userByScreenNameUrl(screen);
+    }
+
+    function retargetFollowRequest(unsigned, screen) {
+      if (!screen) return unsigned;
+      let parsed;
+      try { parsed = JSON.parse(unsigned); } catch (e) { return unsigned; }
+      const existingUrl = parsed.request && parsed.request.url;
+      parsed.request = {
+        url: existingUrl ? swapScreenNameInUrl(existingUrl, screen) : userByScreenNameUrl(screen),
+        method: "GET",
+        header: "",
+        body: ""
+      };
+      parsed.reponseResolve = [
+        { keyName: "screen_name", parseType: "", parsePath: "$.data.user.result.core.screen_name" },
+        { keyName: "following", parseType: "", parsePath: "$.data.user.result.relationship_perspectives.following" }
+      ];
+      return JSON.stringify(parsed);
+    }
+
+    function setHandleTitle(screen) {
+      if (!screen) return;
+      titleEl.textContent = "Prove you follow @" + screen;
+      hintEl.textContent = "Stay logged into X. Primus will prove a follow of @" + screen +
+        " — one Hub template is reused for every X account. Keep the orange popup in front until it finishes.";
+    }
+    if (handle) setHandleTitle(handle);
 
     (async function ready() {
       try {
@@ -45,8 +92,21 @@
           show("Log in on Alpha Quest first, then open this page again.", "err");
           return;
         }
+        if (taskId) {
+          const cfgRes = await fetch("/api/tasks/" + encodeURIComponent(taskId) + "/prove", { credentials: "include" });
+          proveCfg = await cfgRes.json();
+          if (cfgRes.ok) {
+            if (proveCfg.handle) handle = proveCfg.handle;
+            if (proveCfg.templateId) templateId = proveCfg.templateId;
+            setHandleTitle(handle);
+          }
+        }
         if (!templateId) {
-          show("This quest has no Primus Hub template. In Admin, paste a template ID created on x.com/" + (handle || "the-account") + ".", "err");
+          const primusCfg = await fetch("/api/primus/config", { credentials: "include" }).then((r) => r.json());
+          templateId = primusCfg.followTemplateId || "";
+        }
+        if (!templateId) {
+          show("Primus is missing the shared X follow template. Set PRIMUS_TEMPLATE_X_FOLLOW — one UserByScreenName template works for every X handle.", "err");
           return;
         }
         if (typeof window.PrimusZKTLS !== "function" && typeof window.VoiceSenseZKTLS !== "function") {
@@ -60,8 +120,29 @@
       }
     })();
 
+    async function submitProof(task, attestation) {
+      if (submitted || !attestation) return;
+      submitted = true;
+      const verifyRes = await fetch("/api/tasks/" + encodeURIComponent(task) + "/verify", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ attestation: attestation }),
+      });
+      const verifyJson = await verifyRes.json();
+      if (!verifyRes.ok) {
+        submitted = false;
+        throw new Error(verifyJson.error || "Quest rejected the proof");
+      }
+      show("Verified. You can close this tab and return to Alpha Quest.", "ok");
+      try {
+        if (window.opener && !window.opener.closed) window.opener.focus();
+      } catch (e) {}
+    }
+
     async function run(user) {
       btn.disabled = true;
+      submitted = false;
       show("Opening Primus extension… keep the popup in front.", "ok");
       try {
         const cfg = await fetch("/api/primus/config", { credentials: "include" }).then((r) => r.json());
@@ -70,31 +151,45 @@
         const zk = new Ctor();
         await zk.init(cfg.appId);
         const request = zk.generateRequestParams(templateId, user.boundAddress);
-        request.setAdditionParams(JSON.stringify({ taskId: taskId, userId: user.id, handle: handle }));
+        request.setAdditionParams(JSON.stringify({
+          taskId: taskId,
+          userId: user.id,
+          handle: handle,
+          profileUrl: handle ? ("https://x.com/" + handle) : ""
+        }));
         request.setAttMode({ algorithmType: "proxytls" });
-        const unsigned = request.toJsonString();
+        if (typeof request.setAllJsonResponseFlag === "function") {
+          request.setAllJsonResponseFlag("true");
+        } else {
+          request.allJsonResponseFlag = "true";
+        }
+        if (handle) {
+          const screen = handle;
+          const existing = request.request && request.request.url;
+          request.request = {
+            url: existing ? swapScreenNameInUrl(existing, screen) : (proveCfg && proveCfg.request && proveCfg.request.url) || userByScreenNameUrl(screen),
+            method: "GET",
+            header: "",
+            body: ""
+          };
+          request.reponseResolve = [
+            { keyName: "screen_name", parseType: "", parsePath: "$.data.user.result.core.screen_name" },
+            { keyName: "following", parseType: "", parsePath: "$.data.user.result.relationship_perspectives.following" }
+          ];
+        }
+        let unsigned = request.toJsonString();
+        if (handle) unsigned = retargetFollowRequest(unsigned, handle);
         const signedRes = await fetch("/api/primus/sign", {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ signParams: unsigned }),
+          body: JSON.stringify({ signParams: unsigned, taskId: taskId }),
         });
         const signedJson = await signedRes.json();
         if (!signedRes.ok) throw new Error(signedJson.error || "Sign failed");
         const attestation = await zk.startAttestation(signedJson.signResult);
         if (!attestation) throw new Error("Empty proof");
-        const verifyRes = await fetch("/api/tasks/" + encodeURIComponent(taskId) + "/verify", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ attestation: attestation }),
-        });
-        const verifyJson = await verifyRes.json();
-        if (!verifyRes.ok) throw new Error(verifyJson.error || "Quest rejected the proof");
-        show("Verified. You can close this tab and return to Alpha Quest.", "ok");
-        try {
-          if (window.opener && !window.opener.closed) window.opener.focus();
-        } catch (e) {}
+        await submitProof(taskId, attestation);
       } catch (e) {
         show((e && e.message) || String(e), "err");
         btn.disabled = false;

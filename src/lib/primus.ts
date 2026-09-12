@@ -1,4 +1,6 @@
 import { PrimusPageCoreTLS } from "@primuslabs/zktls-page-core-sdk";
+import { xHandleFromRequestUrl } from "./task-config";
+export { defaultTemplateForTask } from "./task-config";
 
 let signer: PrimusPageCoreTLS | null = null;
 
@@ -75,6 +77,18 @@ export function extractIdentity(
     if (hit) return hit;
   }
   return null;
+}
+
+export function extractAttestedXHandle(
+  data: Record<string, unknown>,
+  attestation?: Record<string, unknown>
+): string | null {
+  const fromData = findString(data, "screen_name");
+  if (fromData) return fromData.replace(/^@/, "").trim();
+  const request = attestation?.request as { url?: string } | undefined;
+  const nested = (attestation?.attRequest as { request?: { url?: string } } | undefined)?.request;
+  const url = request?.url || nested?.url;
+  return xHandleFromRequestUrl(url || null);
 }
 
 function findString(obj: unknown, leaf: string): string | null {

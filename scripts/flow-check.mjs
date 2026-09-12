@@ -16,6 +16,15 @@ function loadEnv() {
 const env = loadEnv();
 const results = [];
 
+function swapScreenNameInUrl(url, screen) {
+  const parsed = new URL(url);
+  const raw = parsed.searchParams.get("variables");
+  const variables = JSON.parse(raw);
+  variables.screen_name = screen;
+  parsed.searchParams.set("variables", JSON.stringify(variables));
+  return parsed.toString();
+}
+
 function record(host, name, ok, detail) {
   results.push({ host, name, ok, detail: String(detail).slice(0, 180) });
   console.log(`${ok ? "PASS" : "FAIL"} [${host}] ${name} — ${String(detail).slice(0, 120)}`);
@@ -69,6 +78,23 @@ async function runHost(base) {
     const n = Number(r.headers.get("content-length") || 0);
     if (n < 1000 && n !== 0) throw new Error(`tiny bundle ${n}`);
     record(host, "GET /zktls-bundle.js", true, r.status);
+  });
+
+  await check(host, "GET /prove.html retargets any handle", async () => {
+    const r = await req("/prove.html");
+    if (r.status !== 200) throw new Error(`status ${r.status}`);
+    const text = await r.text();
+    if (!text.includes("retargetFollowRequest") || !text.includes("UserByScreenName")) {
+      throw new Error("prove.html missing any-handle retarget");
+    }
+    if (/Hub template for @/.test(text)) throw new Error("prove.html still asks for a per-user Hub template");
+    record(host, "GET /prove.html retargets any handle", true, "ok");
+  });
+
+  await check(host, "GET /api/tasks/x/prove unauth", async () => {
+    const r = await req("/api/tasks/missing/prove");
+    if (r.status !== 401) throw new Error(`expected 401 got ${r.status}`);
+    record(host, "GET /api/tasks/x/prove unauth", true, "401");
   });
 
   await check(host, "GET /api/campaigns", async () => {
@@ -173,6 +199,31 @@ async function runHost(base) {
     record(host, "POST admin add X_FOLLOW task", true, j.task?.id || "ok");
   });
 
+  await check(host, "POST admin any-handle X_FOLLOW uses shared template", async () => {
+    if (!campaignId) throw new Error("no campaign");
+    const r = await req(`/api/admin/campaigns/${campaignId}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "X_FOLLOW",
+        title: "Follow example_user",
+        points: 7,
+        handle: "example_user",
+      }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(JSON.stringify(j));
+    const listed = await req(`/api/campaigns/${campaignId}/tasks`);
+    const body = await listed.json();
+    if (!listed.ok) throw new Error(JSON.stringify(body));
+    const sample = (body.tasks || []).find(
+      (t) => (t.config?.handle || "").toLowerCase() === "example_user"
+    );
+    if (!sample) throw new Error("example_user task not in campaign tasks");
+    if (!sample.primusTemplateId) throw new Error("any-handle follow missing shared template id");
+    record(host, "POST admin any-handle X_FOLLOW uses shared template", true, sample.primusTemplateId.slice(0, 8));
+  });
+
   await check(host, "GET /api/admin/users", async () => {
     const r = await req("/api/admin/users");
     const j = await r.json();
@@ -203,6 +254,16 @@ async function runHost(base) {
     record(host, "POST email otp unauth", true, "401");
   });
 }
+
+await check("unit", "retarget UserByScreenName screen_name", async () => {
+  const url =
+    "https://x.com/i/api/graphql/Gb-d6r0vxPOADdG62OEBpQ/UserByScreenName?variables=" +
+    encodeURIComponent(JSON.stringify({ screen_name: "example_owner", withGrokTranslatedBio: false }));
+  const next = swapScreenNameInUrl(url, "example_user");
+  const variables = JSON.parse(new URL(next).searchParams.get("variables"));
+  if (variables.screen_name !== "example_user") throw new Error(JSON.stringify(variables));
+  record("unit", "retarget UserByScreenName screen_name", true, variables.screen_name);
+});
 
 const bases = process.argv.slice(2);
 if (!bases.length) {

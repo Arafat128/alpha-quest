@@ -2,14 +2,23 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit";
-import { getPrimusSigner, flattenAttestationData, fieldLooksTrue, extractIdentity, parseAdditionParams } from "@/lib/primus";
+import {
+  getPrimusSigner,
+  flattenAttestationData,
+  fieldLooksTrue,
+  extractIdentity,
+  extractAttestedXHandle,
+  parseAdditionParams,
+} from "@/lib/primus";
 import { hashAttestation, provenIdentityHash } from "@/lib/hash";
-import { parseTaskConfig, sameXHandle } from "@/lib/task-config";
+import { parseTaskConfig, sameXHandle, xHandleFromRequestUrl, normalizeXHandle, defaultTemplateForTask } from "@/lib/task-config";
 import { verifyOnChain } from "@/lib/onchain-verify";
 import { Prisma } from "@prisma/client";
 import { boundAddress } from "@/lib/identity";
 import { logAudit, recomputeRisk } from "@/lib/risk";
 import { clientIp } from "@/lib/session";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(
   req: Request,
@@ -35,7 +44,7 @@ export async function POST(
 
   const body = await req.json().catch(() => null);
   const config = parseTaskConfig(task.config);
-  const targetHandle = config.handle || "example_owner";
+  const targetHandle = normalizeXHandle(config.handle);
 
   if (task.type === "X_FOLLOW" && sameXHandle(user.xHandle, targetHandle)) {
     return complete(
@@ -95,12 +104,16 @@ export async function POST(
     }
   }
 
-  if (task.primusTemplateId) {
-    const claimed =
-      String(attestation.templateId || attestation.templateID || attestation.attTemplateID || "");
-    if (claimed && claimed !== task.primusTemplateId) {
-      return NextResponse.json({ error: "Template mismatch" }, { status: 400 });
-    }
+  const expectedTemplate = defaultTemplateForTask(task.type, task.primusTemplateId);
+  const claimedTemplate = String(
+    attestation.templateId ||
+      attestation.templateID ||
+      attestation.attTemplateID ||
+      (attestation.attRequest as Record<string, unknown> | undefined)?.attTemplateID ||
+      ""
+  );
+  if (claimedTemplate && expectedTemplate && claimedTemplate !== expectedTemplate && claimedTemplate !== task.primusTemplateId) {
+    return NextResponse.json({ error: "Template mismatch" }, { status: 400 });
   }
 
   try {
@@ -122,14 +135,34 @@ export async function POST(
   const data = flattenAttestationData(attestation);
   const required = config.requiredField || (task.type === "X_FOLLOW" ? "following" : "");
   if (task.type === "X_FOLLOW") {
+    const requestUrl =
+      (attestation.request as { url?: string } | undefined)?.url ||
+      ((attestation.attRequest as { request?: { url?: string } } | undefined)?.request?.url);
+    const attestedHandle =
+      extractAttestedXHandle(data, attestation) || xHandleFromRequestUrl(requestUrl || null);
+    if (targetHandle && !attestedHandle) {
+      return NextResponse.json(
+        {
+          error: `Proof did not include which X account was checked. Follow @${targetHandle} on X, then Verify again.`,
+        },
+        { status: 400 }
+      );
+    }
+    if (targetHandle && attestedHandle && !sameXHandle(attestedHandle, targetHandle)) {
+      return NextResponse.json(
+        {
+          error: `This proof is for @${attestedHandle}, but the quest is to follow @${targetHandle}. Stay logged into X and try Verify again.`,
+        },
+        { status: 400 }
+      );
+    }
     const followed = required ? fieldLooksTrue(data, required) : false;
     const isOwner = sameXHandle(user.xHandle, targetHandle);
     if (!followed && !isOwner) {
       return NextResponse.json(
         {
-          error: isOwner
-            ? "Owner check failed"
-            : "This proof does not show a follow. If you are the account owner, log in with that X account first.",
+          error:
+            "This proof does not show a follow. If you are the account owner, log in with that X account first.",
         },
         { status: 400 }
       );
