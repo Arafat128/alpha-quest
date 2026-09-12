@@ -158,10 +158,10 @@ export default function VerifyButton({
           window.open(`https://x.com/${target}`, "_blank", "noopener");
         }
         setMsg(
-          `Stay logged into X on @${config.handle}'s profile. Generating follow proof…`
+          `Opening Primus extension to prove follow of @${config.handle}. Stay logged into X on that profile.`
         );
-        const { PrimusPageCoreTLS } = await import("@primuslabs/zktls-page-core-sdk");
-        const zk = new PrimusPageCoreTLS();
+        const { PrimusExtCoreTLS } = await import("@primuslabs/zktls-ext-core-sdk");
+        const zk = new PrimusExtCoreTLS();
         await zk.init(appId);
         const request = zk.generateRequestParams(
           {

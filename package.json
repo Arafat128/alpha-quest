@@ -19,6 +19,7 @@
     "seed": "node prisma/seed.js"
   },
   "dependencies": {
+    "@primuslabs/zktls-ext-core-sdk": "^0.2.4",
     "@primuslabs/zktls-page-core-sdk": "^0.2.1",
     "@prisma/client": "^5.22.0",
     "@tanstack/react-query": "^5.62.11",
