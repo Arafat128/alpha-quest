@@ -27,7 +27,10 @@ export async function POST(
   };
 
   const type = TYPES.includes(body.type || "") ? body.type! : "X_FOLLOW";
-  const handle = (body.handle || "example_owner").replace(/^@/, "");
+  const handle = (body.handle || "").replace(/^@/, "").trim();
+  if (type === "X_FOLLOW" && !handle) {
+    return NextResponse.json({ error: "X handle is required for a follow quest" }, { status: 400 });
+  }
   const title =
     (body.title || "").trim() ||
     (type === "X_FOLLOW"
@@ -63,7 +66,9 @@ export async function POST(
       points: Math.max(1, Number(body.points) || 50),
       primusTemplateId:
         body.primusTemplateId ||
-        (type === "X_FOLLOW" ? process.env.PRIMUS_TEMPLATE_X_FOLLOW : null) ||
+        (type === "X_FOLLOW" && handle.toLowerCase() === "example_owner"
+          ? process.env.PRIMUS_TEMPLATE_X_FOLLOW
+          : null) ||
         (type === "X_POST" ? process.env.PRIMUS_TEMPLATE_X_POST : null) ||
         null,
       config: JSON.stringify(config),

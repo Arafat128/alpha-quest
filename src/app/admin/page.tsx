@@ -36,7 +36,7 @@ export default function AdminPage() {
   const [taskType, setTaskType] = useState("X_FOLLOW");
   const [taskTitle, setTaskTitle] = useState("");
   const [taskPoints, setTaskPoints] = useState(100);
-  const [handle, setHandle] = useState("example_owner");
+  const [handle, setHandle] = useState("");
   const [guildId, setGuildId] = useState("");
   const [msg, setMsg] = useState("");
   const [taskBusy, setTaskBusy] = useState(false);
@@ -208,7 +208,7 @@ export default function AdminPage() {
           {taskType === "X_FOLLOW" && (
             <input
               className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
-              placeholder="X handle"
+              placeholder="X handle to follow (e.g. example_user)"
               value={handle}
               onChange={(e) => setHandle(e.target.value)}
             />

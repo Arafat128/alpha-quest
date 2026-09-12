@@ -125,25 +125,60 @@ export default function VerifyButton({
 
       const appId = process.env.NEXT_PUBLIC_PRIMUS_APP_ID;
       if (!appId) throw new Error("Verification is not available right now.");
-      if (!primusTemplateId) {
-        throw new Error("This quest has no Primus template yet. Ask an admin to set one.");
-      }
 
-      const Ctor = await waitForPrimus(8000);
-      if (typeof Ctor !== "function") {
-        throw new Error(
-          "Primus SDK did not load. Install the Primus Chrome extension, then refresh."
+      const target = norm(config.handle);
+      const useHubTemplate =
+        Boolean(primusTemplateId) && (!target || target === "example_owner");
+
+      let unsigned = "";
+      let startAttestation: (signed: string) => Promise<unknown>;
+
+      if (useHubTemplate && primusTemplateId) {
+        const Ctor = await waitForPrimus(8000);
+        if (typeof Ctor !== "function") {
+          throw new Error(
+            "Primus SDK did not load. Install the Primus Chrome extension, then refresh."
+          );
+        }
+        setMsg(
+          `Opening Primus… prove follow of @${config.handle || "example_owner"}. Stay logged into X.`
         );
+        const zk = new Ctor();
+        await zk.init(appId);
+        const request = zk.generateRequestParams(primusTemplateId, me.user.boundAddress);
+        request.setAdditionParams(JSON.stringify({ taskId, userId: me.user.id, handle: config.handle }));
+        request.setAttMode({ algorithmType: "proxytls" });
+        unsigned = request.toJsonString();
+        startAttestation = (signed) => zk.startAttestation(signed);
+      } else {
+        if (!config.request?.url || !config.responseResolves?.length) {
+          throw new Error("This follow quest has no target account configured.");
+        }
+        if (target) {
+          window.open(`https://x.com/${target}`, "_blank", "noopener");
+        }
+        setMsg(
+          `Stay logged into X on @${config.handle}'s profile. Generating follow proof…`
+        );
+        const { PrimusPageCoreTLS } = await import("@primuslabs/zktls-page-core-sdk");
+        const zk = new PrimusPageCoreTLS();
+        await zk.init(appId);
+        const request = zk.generateRequestParams(
+          {
+            url: config.request.url,
+            method: config.request.method || "GET",
+            header: config.request.header || {},
+            body: config.request.body || "",
+          },
+          config.responseResolves,
+          me.user.boundAddress
+        );
+        request.setAdditionParams(JSON.stringify({ taskId, userId: me.user.id, handle: config.handle }));
+        request.setAttMode({ algorithmType: "proxytls" });
+        unsigned = request.toJsonString();
+        startAttestation = (signed) => zk.startAttestation(signed);
       }
 
-      setMsg("Opening Primus extension… keep the popup in front and stay logged into X.");
-      const zk = new Ctor();
-      await zk.init(appId);
-      const request = zk.generateRequestParams(primusTemplateId, me.user.boundAddress);
-      request.setAdditionParams(JSON.stringify({ taskId, userId: me.user.id }));
-      request.setAttMode({ algorithmType: "proxytls" });
-
-      const unsigned = request.toJsonString();
       const signedRes = await fetch("/api/primus/sign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -152,7 +187,7 @@ export default function VerifyButton({
       const signedJson = await signedRes.json();
       if (!signedRes.ok) throw new Error(signedJson.error || "Server sign failed");
 
-      const attestation = await zk.startAttestation(signedJson.signResult);
+      const attestation = await startAttestation(signedJson.signResult);
       if (!attestation) throw new Error("Primus returned an empty proof");
 
       const verifyRes = await fetch(`/api/tasks/${taskId}/verify`, {
