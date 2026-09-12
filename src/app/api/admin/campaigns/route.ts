@@ -15,7 +15,12 @@ function slugify(title: string) {
 export async function GET() {
   if (!(await requireAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const campaigns = await prisma.campaign.findMany({
-    include: { _count: { select: { tasks: true } }, tasks: { select: { id: true, title: true, points: true, type: true } } },
+    include: {
+      _count: { select: { tasks: true } },
+      tasks: {
+        select: { id: true, title: true, points: true, type: true, primusTemplateId: true, config: true },
+      },
+    },
     orderBy: { startsAt: "desc" },
   });
   return NextResponse.json({ campaigns });

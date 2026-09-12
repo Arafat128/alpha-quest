@@ -8,7 +8,14 @@ type Campaign = {
   slug: string;
   title: string;
   description: string;
-  tasks: { id: string; title: string; points: number; type: string }[];
+  tasks: {
+    id: string;
+    title: string;
+    points: number;
+    type: string;
+    primusTemplateId?: string | null;
+    config?: string;
+  }[];
 };
 
 type UserRow = {
@@ -285,10 +292,33 @@ export default function AdminPage() {
             <div key={c.id} className="glass rounded-2xl p-5">
               <p className="font-semibold">{c.title}</p>
               <p className="mt-1 text-xs text-slate-500">{c.slug}</p>
-              <ul className="mt-3 space-y-1 text-sm text-slate-400">
+              <ul className="mt-3 space-y-3 text-sm text-slate-400">
                 {c.tasks.map((t) => (
-                  <li key={t.id}>
-                    {t.type} · {t.title} · {t.points} pts
+                  <li key={t.id} className="rounded-xl border border-white/10 p-3">
+                    <div>
+                      {t.type} · {t.title} · {t.points} pts
+                    </div>
+                    {t.type === "X_FOLLOW" && (
+                      <TaskTemplateField
+                        taskId={t.id}
+                        initial={t.primusTemplateId || ""}
+                        onSaved={(id) => {
+                          setCampaigns((prev) =>
+                            prev.map((camp) =>
+                              camp.id !== c.id
+                                ? camp
+                                : {
+                                    ...camp,
+                                    tasks: camp.tasks.map((x) =>
+                                      x.id === t.id ? { ...x, primusTemplateId: id } : x
+                                    ),
+                                  }
+                            )
+                          );
+                          setMsg("Template saved. Players can Verify with the Primus extension.");
+                        }}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
@@ -338,6 +368,56 @@ export default function AdminPage() {
         </div>
       </section>
       {msg && <p className="text-sm text-sky-200">{msg}</p>}
+    </div>
+  );
+}
+
+function TaskTemplateField({
+  taskId,
+  initial,
+  onSaved,
+}: {
+  taskId: string;
+  initial: string;
+  onSaved: (id: string) => void;
+}) {
+  const [value, setValue] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  return (
+    <div className="mt-2">
+      <input
+        className="w-full rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-xs"
+        placeholder="Paste Primus Hub template ID for this X account"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+      />
+      <button
+        className="btn-ghost mt-2 text-xs"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setErr("");
+          try {
+            const res = await fetch(`/api/admin/tasks/${taskId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ primusTemplateId: value }),
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || "Save failed");
+            onSaved(value.trim());
+          } catch (e) {
+            setErr(e instanceof Error ? e.message : "Save failed");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "Saving…" : "Save template ID"}
+      </button>
+      {err && <p className="mt-1 text-xs text-rose-300">{err}</p>}
     </div>
   );
 }
