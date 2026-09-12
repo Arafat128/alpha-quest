@@ -27,12 +27,22 @@ export async function POST(
   };
 
   const type = TYPES.includes(body.type || "") ? body.type! : "X_FOLLOW";
-  const title = (body.title || "").trim();
-  if (!title) return NextResponse.json({ error: "title required" }, { status: 400 });
+  const handle = (body.handle || "example_owner").replace(/^@/, "");
+  const title =
+    (body.title || "").trim() ||
+    (type === "X_FOLLOW"
+      ? `Follow @${handle}`
+      : type === "X_POST"
+        ? "Post on X"
+        : type === "DISCORD_JOIN"
+          ? "Join Discord"
+          : type === "DISCORD_ROLE"
+            ? "Get Discord role"
+            : "Verify email");
 
   let config: Record<string, unknown> = {};
   if (type === "X_FOLLOW") {
-    config = defaultXFollowConfig(body.handle || "example_owner");
+    config = defaultXFollowConfig(handle);
   } else if (type === "X_POST") {
     config = { mention: (body.mention || "primus_labs").replace(/^@/, "") };
   } else if (type === "DISCORD_JOIN" || type === "DISCORD_ROLE") {
@@ -51,7 +61,11 @@ export async function POST(
       title,
       description: (body.description || "").trim() || title,
       points: Math.max(1, Number(body.points) || 50),
-      primusTemplateId: body.primusTemplateId || null,
+      primusTemplateId:
+        body.primusTemplateId ||
+        (type === "X_FOLLOW" ? process.env.PRIMUS_TEMPLATE_X_FOLLOW : null) ||
+        (type === "X_POST" ? process.env.PRIMUS_TEMPLATE_X_POST : null) ||
+        null,
       config: JSON.stringify(config),
       sortOrder: (last?.sortOrder || 0) + 1,
     },

@@ -39,6 +39,7 @@ export default function AdminPage() {
   const [handle, setHandle] = useState("example_owner");
   const [guildId, setGuildId] = useState("");
   const [msg, setMsg] = useState("");
+  const [taskBusy, setTaskBusy] = useState(false);
 
   async function load() {
     const me = await fetch("/api/auth/me").then((r) => r.json());
@@ -223,33 +224,48 @@ export default function AdminPage() {
         </div>
         <button
           className="btn-primary mt-4"
+          disabled={taskBusy}
           onClick={async () => {
-            if (!taskCampaign) return;
-            const res = await fetch(`/api/admin/campaigns/${taskCampaign}/tasks`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                type: taskType,
-                title: taskTitle,
-                points: taskPoints,
-                handle,
-                guildId,
-              }),
-            });
-            const json = await res.json();
-            setMsg(res.ok ? `Added ${json.task.title}` : json.error);
-            if (res.ok && json.task) {
+            const campaignId = taskCampaign || campaigns[0]?.id;
+            if (!campaignId) {
+              setMsg("Create a campaign first, then add a task.");
+              return;
+            }
+            setTaskBusy(true);
+            try {
+              const res = await fetch(`/api/admin/campaigns/${campaignId}/tasks`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  type: taskType,
+                  title: taskTitle,
+                  points: taskPoints,
+                  handle,
+                  guildId,
+                }),
+              });
+              const json = await res.json();
+              if (!res.ok) {
+                setMsg(json.error || "Could not add task");
+                return;
+              }
+              setMsg(`Added “${json.task.title}”`);
               setCampaigns((prev) =>
                 prev.map((c) =>
-                  c.id === taskCampaign ? { ...c, tasks: [...(c.tasks || []), json.task] } : c
+                  c.id === campaignId ? { ...c, tasks: [...(c.tasks || []), json.task] } : c
                 )
               );
               setTaskTitle("");
+            } catch (e) {
+              setMsg(e instanceof Error ? e.message : "Could not add task");
+            } finally {
+              setTaskBusy(false);
             }
           }}
         >
-          Add task
+          {taskBusy ? "Adding…" : "Add task"}
         </button>
+        {msg && <p className="mt-3 text-sm text-sky-200">{msg}</p>}
       </section>
 
       <section>
