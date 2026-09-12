@@ -20,6 +20,13 @@ export type TaskConfig = {
   responseResolves?: ResponseResolve[];
 };
 
+export function sameXHandle(a?: string | null, b?: string | null) {
+  const n = (s?: string | null) => (s || "").replace(/^@/, "").trim().toLowerCase();
+  const left = n(a);
+  const right = n(b);
+  return Boolean(left && right && left === right);
+}
+
 export function parseTaskConfig(raw: string): TaskConfig {
   try {
     const parsed = JSON.parse(raw) as TaskConfig;

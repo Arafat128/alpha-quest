@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit";
 import { getPrimusSigner, flattenAttestationData, fieldLooksTrue, extractIdentity, parseAdditionParams } from "@/lib/primus";
 import { hashAttestation, provenIdentityHash } from "@/lib/hash";
-import { parseTaskConfig } from "@/lib/task-config";
+import { parseTaskConfig, sameXHandle } from "@/lib/task-config";
 import { verifyOnChain } from "@/lib/onchain-verify";
 import { Prisma } from "@prisma/client";
 import { boundAddress } from "@/lib/identity";
@@ -35,6 +35,18 @@ export async function POST(
 
   const body = await req.json().catch(() => null);
   const config = parseTaskConfig(task.config);
+  const targetHandle = config.handle || "example_owner";
+
+  if (task.type === "X_FOLLOW" && sameXHandle(user.xHandle, targetHandle)) {
+    return complete(
+      user.id,
+      task,
+      "x",
+      user.xUserId || user.xHandle || user.id,
+      { source: "x-oauth-owner", handle: user.xHandle },
+      req
+    );
+  }
 
   if (task.type === "EMAIL_VERIFY") {
     if (!user.emailVerifiedAt) {
@@ -109,14 +121,19 @@ export async function POST(
 
   const data = flattenAttestationData(attestation);
   const required = config.requiredField || (task.type === "X_FOLLOW" ? "following" : "");
-  if (task.type === "X_FOLLOW" && required && !fieldLooksTrue(data, required)) {
-    return NextResponse.json(
-      {
-        error: `This proof does not show a completed follow.`,
-        fields: Object.keys(data),
-      },
-      { status: 400 }
-    );
+  if (task.type === "X_FOLLOW") {
+    const followed = required ? fieldLooksTrue(data, required) : false;
+    const isOwner = sameXHandle(user.xHandle, targetHandle);
+    if (!followed && !isOwner) {
+      return NextResponse.json(
+        {
+          error: isOwner
+            ? "Owner check failed"
+            : "This proof does not show a follow. If you are the account owner, log in with that X account first.",
+        },
+        { status: 400 }
+      );
+    }
   }
   if (task.type === "X_POST" && config.mention) {
     const blob = JSON.stringify(data).toLowerCase();

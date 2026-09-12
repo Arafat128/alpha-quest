@@ -90,6 +90,26 @@ export default function VerifyButton({
       const me = await meRes.json();
       if (!me.user?.id) throw new Error("Log in with X or Discord first");
 
+      const norm = (s?: string | null) => (s || "").replace(/^@/, "").trim().toLowerCase();
+      if (
+        type === "X_FOLLOW" &&
+        norm(me.user.xHandle) &&
+        norm(config.handle) &&
+        norm(me.user.xHandle) === norm(config.handle)
+      ) {
+        setMsg("You are the account owner — completing this quest.");
+        const res = await fetch(`/api/tasks/${taskId}/verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Verify failed");
+        setMsg("");
+        onDone?.();
+        return;
+      }
+
       if (type === "EMAIL_VERIFY" || type === "DISCORD_JOIN" || type === "DISCORD_ROLE") {
         const res = await fetch(`/api/tasks/${taskId}/verify`, {
           method: "POST",

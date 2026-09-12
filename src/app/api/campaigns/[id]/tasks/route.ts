@@ -54,6 +54,9 @@ export async function GET(
           responseResolves: config.responseResolves,
         },
         status: done.has(task.id) ? "verified" : "not_started",
+        ownerCompletes:
+          task.type === "X_FOLLOW" &&
+          Boolean(config.handle),
       };
     }),
   });
