@@ -34,6 +34,8 @@
     const titleEl = document.getElementById("title");
     const hintEl = document.getElementById("hint");
     let submitted = false;
+    let zkHandle = null;
+    let requestid = null;
 
     function show(msg, kind) {
       statusEl.innerHTML = msg ? '<p class="' + (kind || "") + '">' + msg + "</p>" : "";
@@ -105,11 +107,21 @@
     async function submitProof(task, attestation) {
       if (submitted || !attestation) return;
       submitted = true;
+      let extras = {};
+      try {
+        const rid = attestation.requestid || requestid;
+        if (rid && zkHandle && typeof zkHandle.getAllJsonResponse === "function") {
+          extras.allJsonResponse = zkHandle.getAllJsonResponse(rid);
+        }
+        if (rid && zkHandle && typeof zkHandle.getPrivateData === "function") {
+          extras.privateData = zkHandle.getPrivateData(rid);
+        }
+      } catch (e) {}
       const verifyRes = await fetch("/api/tasks/" + encodeURIComponent(task) + "/verify", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ attestation: attestation }),
+        body: JSON.stringify({ attestation: attestation, extras: extras }),
       });
       const verifyJson = await verifyRes.json();
       if (!verifyRes.ok) {
@@ -131,6 +143,7 @@
         if (!cfg.appId) throw new Error("Primus app is not configured");
         const Ctor = window.PrimusZKTLS || window.VoiceSenseZKTLS;
         const zk = new Ctor();
+        zkHandle = zk;
         await zk.init(cfg.appId);
         const request = zk.generateRequestParams(templateId, user.boundAddress);
         request.setAttMode({ algorithmType: "proxytls" });
@@ -153,7 +166,14 @@
         });
         const signedJson = await signedRes.json();
         if (!signedRes.ok) throw new Error(signedJson.error || "Sign failed");
-        const attestation = await zk.startAttestation(signedJson.signResult);
+        const signed =
+          typeof signedJson.signResult === "string"
+            ? signedJson.signResult
+            : JSON.stringify(signedJson.signResult);
+        try {
+          requestid = JSON.parse(signed).attRequest.requestid || null;
+        } catch (e) {}
+        const attestation = await zk.startAttestation(signed);
         if (!attestation) throw new Error("Empty proof");
         await submitProof(taskId, attestation);
       } catch (e) {

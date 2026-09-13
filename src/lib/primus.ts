@@ -64,6 +64,73 @@ function walkTrue(obj: unknown, leaf: string): boolean {
   return false;
 }
 
+const FOLLOW_IGNORE = new Set([
+  "followed_by",
+  "super_following",
+  "super_followed_by",
+  "following_count",
+  "followers_count",
+  "friends_count",
+  "follow_request_sent",
+]);
+const FOLLOW_LEAVES = new Set(["following", "is_following", "isfollowing", "viewer_following"]);
+
+function coerceFollowBool(value: unknown): boolean | null {
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0) return false;
+  if (typeof value === "number" && value > 1) return null;
+  if (typeof value === "string") {
+    const t = value.trim().toLowerCase();
+    if (t === "true" || t === "yes" || t === "following") return true;
+    if (t === "false" || t === "no" || t === "follow") return false;
+  }
+  return null;
+}
+
+/** Viewer-follows-profile flag. null = Hub only returned screen_name / a count. */
+export function followFlagFromProof(...blobs: unknown[]): boolean | null {
+  let sawTrue = false;
+  let sawFalse = false;
+  function walk(node: unknown, path: string) {
+    if (node == null) return;
+    if (typeof node === "string") {
+      const s = node.trim();
+      if (s.startsWith("{") || s.startsWith("[")) {
+        try {
+          walk(JSON.parse(s), path);
+        } catch {
+          return;
+        }
+      }
+      return;
+    }
+    if (Array.isArray(node)) {
+      node.forEach((item, i) => walk(item, `${path}[${i}]`));
+      return;
+    }
+    if (typeof node !== "object") return;
+    for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+      const leaf = key.toLowerCase().split(".").pop() || "";
+      const child = path ? `${path}.${key}` : key;
+      const lowPath = child.toLowerCase();
+      if (FOLLOW_IGNORE.has(leaf) || leaf.endsWith("count") || lowPath.includes("relationship_counts")) {
+        walk(value, child);
+        continue;
+      }
+      if (FOLLOW_LEAVES.has(leaf) || (lowPath.includes("relationship_perspectives") && leaf === "following")) {
+        const flag = coerceFollowBool(value);
+        if (flag === true) sawTrue = true;
+        if (flag === false) sawFalse = true;
+      }
+      walk(value, child);
+    }
+  }
+  for (const blob of blobs) walk(blob, "");
+  if (sawTrue) return true;
+  if (sawFalse) return false;
+  return null;
+}
+
 export function extractIdentity(
   data: Record<string, unknown>,
   platform: "x" | "discord"

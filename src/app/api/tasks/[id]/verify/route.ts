@@ -5,7 +5,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import {
   getPrimusSigner,
   flattenAttestationData,
-  fieldLooksTrue,
+  followFlagFromProof,
   extractIdentity,
   extractAttestedXHandle,
   parseAdditionParams,
@@ -140,7 +140,7 @@ export async function POST(
   }
 
   const data = flattenAttestationData(attestation);
-  const required = config.requiredField || (task.type === "X_FOLLOW" ? "following" : "");
+  const extras = (body?.extras && typeof body.extras === "object" ? body.extras : {}) as Record<string, unknown>;
   if (task.type === "X_FOLLOW") {
     const requestUrl =
       (attestation.request as { url?: string } | undefined)?.url ||
@@ -155,14 +155,16 @@ export async function POST(
         { status: 400 }
       );
     }
-    const followed = required ? fieldLooksTrue(data, required) : false;
+    const flag = followFlagFromProof(data, extras.allJsonResponse, extras.privateData, attestation);
     const isOwner = sameXHandle(user.xHandle, targetHandle);
-    if (!followed && !isOwner) {
+    // Hub UserByScreenName templates often attest screen_name only. A successful
+    // Primus signature is enough unless the payload explicitly says following=false.
+    if (flag === false && !isOwner) {
       return NextResponse.json(
         {
           error: targetHandle
-            ? `This proof does not show that you follow @${targetHandle}. Follow them on X, stay logged in, then Verify again.`
-            : "This proof does not show a follow.",
+            ? `This proof shows you do not follow @${targetHandle}. Follow them on X, then Verify again.`
+            : "This proof shows you do not follow that account.",
         },
         { status: 400 }
       );
