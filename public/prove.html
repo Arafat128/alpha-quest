@@ -13,13 +13,14 @@
     button:disabled { opacity:.4; cursor:not-allowed; }
     .ok { color:#6ee7b7; margin-top:1rem; }
     .err { color:#fca5a5; margin-top:1rem; }
+    a { color:#7dd3fc; }
   </style>
 </head>
 <body>
   <div class="card">
     <p class="muted">Primus extension</p>
     <h1 id="title">Prove follow</h1>
-    <p class="muted" id="hint">Stay logged into X. Click Start proof, then keep the orange Primus popup in front until it finishes.</p>
+    <p class="muted" id="hint">Stay logged into X in this Chrome profile. Click Start proof, then keep the orange Primus popup in front until it finishes.</p>
     <div id="status"></div>
     <button id="prove" disabled>Start proof</button>
   </div>
@@ -36,13 +37,33 @@
     let proveCfg = null;
     let submitted = false;
 
+    const FEATURES = {
+      hidden_profile_subscriptions_enabled: true,
+      profile_label_improvements_pcf_label_in_post_enabled: true,
+      responsive_web_profile_redirect_enabled: false,
+      rweb_tipjar_consumption_enabled: true,
+      verified_phone_label_enabled: false,
+      subscriptions_verification_info_is_identity_verified_enabled: true,
+      subscriptions_verification_info_verified_since_enabled: true,
+      highlights_tweets_tab_ui_enabled: true,
+      responsive_web_twitter_article_notes_tab_enabled: true,
+      subscriptions_feature_can_gift_premium: true,
+      creator_subscriptions_tweet_preview_api_enabled: true,
+      responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+      responsive_web_graphql_timeline_navigation_enabled: true
+    };
+    const FIELD_TOGGLES = { withPayments: false, withAuxiliaryUserLabels: true };
+
     function show(msg, kind) {
       statusEl.innerHTML = msg ? '<p class="' + (kind || "") + '">' + msg + "</p>" : "";
     }
 
     function userByScreenNameUrl(screen) {
-      return "https://x.com/i/api/graphql/Gb-d6r0vxPOADdG62OEBpQ/UserByScreenName?variables=" +
-        encodeURIComponent(JSON.stringify({ screen_name: screen, withGrokTranslatedBio: false }));
+      const variables = JSON.stringify({ screen_name: screen, withGrokTranslatedBio: false });
+      return "https://x.com/i/api/graphql/Gb-d6r0vxPOADdG62OEBpQ/UserByScreenName" +
+        "?variables=" + encodeURIComponent(variables) +
+        "&features=" + encodeURIComponent(JSON.stringify(FEATURES)) +
+        "&fieldToggles=" + encodeURIComponent(JSON.stringify(FIELD_TOGGLES));
     }
 
     function swapScreenNameInUrl(url, screen) {
@@ -53,6 +74,12 @@
           const variables = JSON.parse(raw);
           variables.screen_name = screen;
           parsed.searchParams.set("variables", JSON.stringify(variables));
+          if (!parsed.searchParams.get("features")) {
+            parsed.searchParams.set("features", JSON.stringify(FEATURES));
+          }
+          if (!parsed.searchParams.get("fieldToggles")) {
+            parsed.searchParams.set("fieldToggles", JSON.stringify(FIELD_TOGGLES));
+          }
           return parsed.toString();
         }
       } catch (e) {}
@@ -63,25 +90,41 @@
       if (!screen) return unsigned;
       let parsed;
       try { parsed = JSON.parse(unsigned); } catch (e) { return unsigned; }
-      const existingUrl = parsed.request && parsed.request.url;
+      const existing = parsed.request || {};
+      const existingUrl = existing.url || "";
       parsed.request = {
         url: existingUrl ? swapScreenNameInUrl(existingUrl, screen) : userByScreenNameUrl(screen),
-        method: "GET",
-        header: "",
-        body: ""
+        method: existing.method || "GET",
+        header: typeof existing.header === "string" ? existing.header : "",
+        body: typeof existing.body === "string" ? existing.body : ""
       };
-      parsed.reponseResolve = [
-        { keyName: "screen_name", parseType: "", parsePath: "$.data.user.result.core.screen_name" },
-        { keyName: "following", parseType: "", parsePath: "$.data.user.result.relationship_perspectives.following" }
-      ];
       return JSON.stringify(parsed);
+    }
+
+    function friendlyError(err) {
+      const msg = (err && err.message) || (typeof err === "string" ? err : "");
+      const code = (err && err.code) || "";
+      const blob = (code + " " + msg).toLowerCase();
+      if (blob.indexOf("00013") >= 0 || blob.indexOf("no verifiable data") >= 0) {
+        return "Primus could not read X. In this same Chrome profile stay logged into X, open " +
+          (handle ? ("x.com/" + handle) : "x.com") +
+          ", then click Try again. Keep the orange popup in front — do not switch accounts.";
+      }
+      if (blob.indexOf("00006") >= 0 || blob.indexOf("extension not detected") >= 0) {
+        return "Install and enable the Primus Chrome extension, then try again.";
+      }
+      if (blob.indexOf("session expired") >= 0 || blob.indexOf("30001:401") >= 0) {
+        return "Your X login expired. Log into X in this Chrome profile, then try again.";
+      }
+      return msg || String(err);
     }
 
     function setHandleTitle(screen) {
       if (!screen) return;
       titleEl.textContent = "Prove you follow @" + screen;
-      hintEl.textContent = "Stay logged into X. Primus will prove a follow of @" + screen +
-        " — one Hub template is reused for every X account. Keep the orange popup in front until it finishes.";
+      hintEl.innerHTML = "Stay logged into X in this Chrome profile. A tab to " +
+        '<a href="https://x.com/' + screen + '" target="alpha-quest-x-profile" rel="noreferrer">x.com/' + screen + "</a>" +
+        " may open so Primus can read the follow. Keep the orange popup in front until it finishes.";
     }
     if (handle) setHandleTitle(handle);
 
@@ -106,7 +149,7 @@
           templateId = primusCfg.followTemplateId || "";
         }
         if (!templateId) {
-          show("Primus is missing the shared X follow template. Set PRIMUS_TEMPLATE_X_FOLLOW — one UserByScreenName template works for every X handle.", "err");
+          show("Primus is missing the shared X follow template.", "err");
           return;
         }
         if (typeof window.PrimusZKTLS !== "function" && typeof window.VoiceSenseZKTLS !== "function") {
@@ -145,6 +188,9 @@
       submitted = false;
       show("Opening Primus extension… keep the popup in front.", "ok");
       try {
+        if (handle) {
+          try { window.open("https://x.com/" + handle, "alpha-quest-x-profile"); } catch (e) {}
+        }
         const cfg = await fetch("/api/primus/config", { credentials: "include" }).then((r) => r.json());
         if (!cfg.appId) throw new Error("Primus app is not configured");
         const Ctor = window.PrimusZKTLS || window.VoiceSenseZKTLS;
@@ -164,18 +210,16 @@
           request.allJsonResponseFlag = "true";
         }
         if (handle) {
-          const screen = handle;
-          const existing = request.request && request.request.url;
+          const existingUrl = request.request && request.request.url;
+          const fromCfg = proveCfg && proveCfg.request && proveCfg.request.url;
           request.request = {
-            url: existing ? swapScreenNameInUrl(existing, screen) : (proveCfg && proveCfg.request && proveCfg.request.url) || userByScreenNameUrl(screen),
+            url: existingUrl
+              ? swapScreenNameInUrl(existingUrl, handle)
+              : (fromCfg ? swapScreenNameInUrl(fromCfg, handle) : userByScreenNameUrl(handle)),
             method: "GET",
             header: "",
             body: ""
           };
-          request.reponseResolve = [
-            { keyName: "screen_name", parseType: "", parsePath: "$.data.user.result.core.screen_name" },
-            { keyName: "following", parseType: "", parsePath: "$.data.user.result.relationship_perspectives.following" }
-          ];
         }
         let unsigned = request.toJsonString();
         if (handle) unsigned = retargetFollowRequest(unsigned, handle);
@@ -191,7 +235,7 @@
         if (!attestation) throw new Error("Empty proof");
         await submitProof(taskId, attestation);
       } catch (e) {
-        show((e && e.message) || String(e), "err");
+        show(friendlyError(e), "err");
         btn.disabled = false;
         btn.textContent = "Try again";
       }

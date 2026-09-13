@@ -22,6 +22,9 @@ function swapScreenNameInUrl(url, screen) {
   const variables = JSON.parse(raw);
   variables.screen_name = screen;
   parsed.searchParams.set("variables", JSON.stringify(variables));
+  if (!parsed.searchParams.get("features")) {
+    parsed.searchParams.set("features", JSON.stringify({ hidden_profile_subscriptions_enabled: true }));
+  }
   return parsed.toString();
 }
 
@@ -86,6 +89,9 @@ async function runHost(base) {
     const text = await r.text();
     if (!text.includes("retargetFollowRequest") || !text.includes("UserByScreenName")) {
       throw new Error("prove.html missing any-handle retarget");
+    }
+    if (!text.includes("fieldToggles") || !text.includes("00013")) {
+      throw new Error("prove.html missing complete GraphQL URL or 00013 handling");
     }
     if (/Hub template for @/.test(text)) throw new Error("prove.html still asks for a per-user Hub template");
     record(host, "GET /prove.html retargets any handle", true, "ok");
@@ -260,8 +266,10 @@ await check("unit", "retarget UserByScreenName screen_name", async () => {
     "https://x.com/i/api/graphql/Gb-d6r0vxPOADdG62OEBpQ/UserByScreenName?variables=" +
     encodeURIComponent(JSON.stringify({ screen_name: "example_owner", withGrokTranslatedBio: false }));
   const next = swapScreenNameInUrl(url, "example_user");
-  const variables = JSON.parse(new URL(next).searchParams.get("variables"));
+  const parsed = new URL(next);
+  const variables = JSON.parse(parsed.searchParams.get("variables"));
   if (variables.screen_name !== "example_user") throw new Error(JSON.stringify(variables));
+  if (!parsed.searchParams.get("features")) throw new Error("missing features query (causes Primus 00013)");
   record("unit", "retarget UserByScreenName screen_name", true, variables.screen_name);
 });
 

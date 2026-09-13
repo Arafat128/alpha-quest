@@ -50,17 +50,50 @@ export const X_FOLLOW_RESOLVES: ResponseResolve[] = [
   },
 ];
 
+/** X GraphQL rejects UserByScreenName without these; missing them is Primus 00013. */
+export const USER_BY_SCREEN_NAME_FEATURES = {
+  hidden_profile_subscriptions_enabled: true,
+  profile_label_improvements_pcf_label_in_post_enabled: true,
+  responsive_web_profile_redirect_enabled: false,
+  rweb_tipjar_consumption_enabled: true,
+  verified_phone_label_enabled: false,
+  subscriptions_verification_info_is_identity_verified_enabled: true,
+  subscriptions_verification_info_verified_since_enabled: true,
+  highlights_tweets_tab_ui_enabled: true,
+  responsive_web_twitter_article_notes_tab_enabled: true,
+  subscriptions_feature_can_gift_premium: true,
+  creator_subscriptions_tweet_preview_api_enabled: true,
+  responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+  responsive_web_graphql_timeline_navigation_enabled: true,
+};
+
+export const USER_BY_SCREEN_NAME_FIELD_TOGGLES = {
+  withPayments: false,
+  withAuxiliaryUserLabels: true,
+};
+
+export function userByScreenNameQueryId() {
+  return (
+    (typeof process !== "undefined" && process.env?.PRIMUS_X_FOLLOW_QUERY_ID) ||
+    "Gb-d6r0vxPOADdG62OEBpQ"
+  );
+}
+
 export function userByScreenNameUrl(handle: string): string {
   const screen = normalizeXHandle(handle);
+  const variables = JSON.stringify({ screen_name: screen, withGrokTranslatedBio: false });
   return (
-    "https://x.com/i/api/graphql/Gb-d6r0vxPOADdG62OEBpQ/UserByScreenName?variables=" +
-    encodeURIComponent(JSON.stringify({ screen_name: screen, withGrokTranslatedBio: false }))
+    `https://x.com/i/api/graphql/${userByScreenNameQueryId()}/UserByScreenName` +
+    `?variables=${encodeURIComponent(variables)}` +
+    `&features=${encodeURIComponent(JSON.stringify(USER_BY_SCREEN_NAME_FEATURES))}` +
+    `&fieldToggles=${encodeURIComponent(JSON.stringify(USER_BY_SCREEN_NAME_FIELD_TOGGLES))}`
   );
 }
 
 export function swapScreenNameInUrl(url: string, handle: string): string {
   const screen = normalizeXHandle(handle);
-  if (!screen || !url) return url;
+  if (!screen) return url;
+  if (!url) return userByScreenNameUrl(screen);
   try {
     const parsed = new URL(url);
     const raw = parsed.searchParams.get("variables");
@@ -69,14 +102,19 @@ export function swapScreenNameInUrl(url: string, handle: string): string {
       if (variables && typeof variables === "object") {
         variables.screen_name = screen;
         parsed.searchParams.set("variables", JSON.stringify(variables));
+        if (!parsed.searchParams.get("features")) {
+          parsed.searchParams.set("features", JSON.stringify(USER_BY_SCREEN_NAME_FEATURES));
+        }
+        if (!parsed.searchParams.get("fieldToggles")) {
+          parsed.searchParams.set("fieldToggles", JSON.stringify(USER_BY_SCREEN_NAME_FIELD_TOGGLES));
+        }
         return parsed.toString();
       }
     }
   } catch {
-    // fall through to a constructed UserByScreenName URL
+    // fall through
   }
-  if (/UserByScreenName/i.test(url)) return userByScreenNameUrl(screen);
-  return url;
+  return userByScreenNameUrl(screen);
 }
 
 export function xHandleFromRequestUrl(url?: string | null): string | null {
@@ -132,19 +170,21 @@ export function retargetFollowAttRequest(attRequest: Record<string, unknown>, ha
   if (!screen) return attRequest;
   const existing = attRequest.request;
   let url = "";
-  if (existing && typeof existing === "object" && typeof (existing as { url?: unknown }).url === "string") {
-    url = (existing as { url: string }).url;
+  let header = "";
+  let body = "";
+  let method = "GET";
+  if (existing && typeof existing === "object") {
+    const req = existing as { url?: unknown; header?: unknown; body?: unknown; method?: unknown };
+    if (typeof req.url === "string") url = req.url;
+    if (typeof req.header === "string") header = req.header;
+    if (typeof req.body === "string") body = req.body;
+    if (typeof req.method === "string" && req.method) method = req.method;
   }
   attRequest.request = {
     url: url ? swapScreenNameInUrl(url, screen) : userByScreenNameUrl(screen),
-    method: "GET",
-    header: "",
-    body: "",
+    method,
+    header,
+    body,
   };
-  attRequest.reponseResolve = X_FOLLOW_RESOLVES.map((item) => ({
-    keyName: item.keyName,
-    parseType: "",
-    parsePath: item.parsePath,
-  }));
   return attRequest;
 }
