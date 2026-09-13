@@ -13,13 +13,12 @@
     button:disabled { opacity:.4; cursor:not-allowed; }
     .ok { color:#6ee7b7; margin-top:1rem; }
     .err { color:#fca5a5; margin-top:1rem; }
-    a { color:#7dd3fc; }
   </style>
 </head>
 <body>
   <div class="card">
     <p class="muted">Primus extension</p>
-    <h1 id="title">Prove follow</h1>
+    <h1 id="title">Prove with Primus</h1>
     <p class="muted" id="hint">Stay logged into X in this Chrome profile. Click Start proof, then keep the orange Primus popup in front until it finishes.</p>
     <div id="status"></div>
     <button id="prove" disabled>Start proof</button>
@@ -34,71 +33,10 @@
     const btn = document.getElementById("prove");
     const titleEl = document.getElementById("title");
     const hintEl = document.getElementById("hint");
-    let proveCfg = null;
     let submitted = false;
-
-    const FEATURES = {
-      hidden_profile_subscriptions_enabled: true,
-      profile_label_improvements_pcf_label_in_post_enabled: true,
-      responsive_web_profile_redirect_enabled: false,
-      rweb_tipjar_consumption_enabled: true,
-      verified_phone_label_enabled: false,
-      subscriptions_verification_info_is_identity_verified_enabled: true,
-      subscriptions_verification_info_verified_since_enabled: true,
-      highlights_tweets_tab_ui_enabled: true,
-      responsive_web_twitter_article_notes_tab_enabled: true,
-      subscriptions_feature_can_gift_premium: true,
-      creator_subscriptions_tweet_preview_api_enabled: true,
-      responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
-      responsive_web_graphql_timeline_navigation_enabled: true
-    };
-    const FIELD_TOGGLES = { withPayments: false, withAuxiliaryUserLabels: true };
 
     function show(msg, kind) {
       statusEl.innerHTML = msg ? '<p class="' + (kind || "") + '">' + msg + "</p>" : "";
-    }
-
-    function userByScreenNameUrl(screen) {
-      const variables = JSON.stringify({ screen_name: screen, withGrokTranslatedBio: false });
-      return "https://x.com/i/api/graphql/Gb-d6r0vxPOADdG62OEBpQ/UserByScreenName" +
-        "?variables=" + encodeURIComponent(variables) +
-        "&features=" + encodeURIComponent(JSON.stringify(FEATURES)) +
-        "&fieldToggles=" + encodeURIComponent(JSON.stringify(FIELD_TOGGLES));
-    }
-
-    function swapScreenNameInUrl(url, screen) {
-      try {
-        const parsed = new URL(url);
-        const raw = parsed.searchParams.get("variables");
-        if (raw) {
-          const variables = JSON.parse(raw);
-          variables.screen_name = screen;
-          parsed.searchParams.set("variables", JSON.stringify(variables));
-          if (!parsed.searchParams.get("features")) {
-            parsed.searchParams.set("features", JSON.stringify(FEATURES));
-          }
-          if (!parsed.searchParams.get("fieldToggles")) {
-            parsed.searchParams.set("fieldToggles", JSON.stringify(FIELD_TOGGLES));
-          }
-          return parsed.toString();
-        }
-      } catch (e) {}
-      return userByScreenNameUrl(screen);
-    }
-
-    function retargetFollowRequest(unsigned, screen) {
-      if (!screen) return unsigned;
-      let parsed;
-      try { parsed = JSON.parse(unsigned); } catch (e) { return unsigned; }
-      const existing = parsed.request || {};
-      const existingUrl = existing.url || "";
-      parsed.request = {
-        url: existingUrl ? swapScreenNameInUrl(existingUrl, screen) : userByScreenNameUrl(screen),
-        method: existing.method || "GET",
-        header: typeof existing.header === "string" ? existing.header : "",
-        body: typeof existing.body === "string" ? existing.body : ""
-      };
-      return JSON.stringify(parsed);
     }
 
     function friendlyError(err) {
@@ -106,9 +44,7 @@
       const code = (err && err.code) || "";
       const blob = (code + " " + msg).toLowerCase();
       if (blob.indexOf("00013") >= 0 || blob.indexOf("no verifiable data") >= 0) {
-        return "Primus could not read X. In this same Chrome profile stay logged into X, open " +
-          (handle ? ("x.com/" + handle) : "x.com") +
-          ", then click Try again. Keep the orange popup in front — do not switch accounts.";
+        return "Primus could not read X. Stay logged into X in this same Chrome profile, follow the account if you have not, keep the orange popup in front, then Try again.";
       }
       if (blob.indexOf("00006") >= 0 || blob.indexOf("extension not detected") >= 0) {
         return "Install and enable the Primus Chrome extension, then try again.";
@@ -116,17 +52,16 @@
       if (blob.indexOf("session expired") >= 0 || blob.indexOf("30001:401") >= 0) {
         return "Your X login expired. Log into X in this Chrome profile, then try again.";
       }
+      if (blob.indexOf("timeout") >= 0 || blob.indexOf("interrupt") >= 0 || blob.indexOf("timed out") >= 0) {
+        return "Connection dropped before Primus finished. Keep the popup in front, stay on this tab, then click Try again.";
+      }
       return msg || String(err);
     }
 
-    function setHandleTitle(screen) {
-      if (!screen) return;
-      titleEl.textContent = "Prove you follow @" + screen;
-      hintEl.innerHTML = "Stay logged into X in this Chrome profile. A tab to " +
-        '<a href="https://x.com/' + screen + '" target="alpha-quest-x-profile" rel="noreferrer">x.com/' + screen + "</a>" +
-        " may open so Primus can read the follow. Keep the orange popup in front until it finishes.";
+    if (handle) {
+      titleEl.textContent = "Prove you follow @" + handle;
+      hintEl.textContent = "Stay logged into X. Follow @" + handle + " if you have not. Click Start proof and keep the orange Primus popup in front until it finishes.";
     }
-    if (handle) setHandleTitle(handle);
 
     (async function ready() {
       try {
@@ -137,11 +72,14 @@
         }
         if (taskId) {
           const cfgRes = await fetch("/api/tasks/" + encodeURIComponent(taskId) + "/prove", { credentials: "include" });
-          proveCfg = await cfgRes.json();
+          const proveCfg = await cfgRes.json();
           if (cfgRes.ok) {
             if (proveCfg.handle) handle = proveCfg.handle;
             if (proveCfg.templateId) templateId = proveCfg.templateId;
-            setHandleTitle(handle);
+            if (handle) {
+              titleEl.textContent = "Prove you follow @" + handle;
+              hintEl.textContent = "Stay logged into X. Follow @" + handle + " if you have not. Click Start proof and keep the orange Primus popup in front until it finishes.";
+            }
           }
         }
         if (!templateId) {
@@ -149,7 +87,7 @@
           templateId = primusCfg.followTemplateId || "";
         }
         if (!templateId) {
-          show("Primus is missing the shared X follow template.", "err");
+          show("This quest has no Primus Hub template.", "err");
           return;
         }
         if (typeof window.PrimusZKTLS !== "function" && typeof window.VoiceSenseZKTLS !== "function") {
@@ -158,6 +96,7 @@
         }
         btn.disabled = false;
         btn.onclick = function () { run(me.user); };
+        show("Extension ready. Click Start proof.", "ok");
       } catch (e) {
         show(String(e && e.message || e), "err");
       }
@@ -186,43 +125,26 @@
     async function run(user) {
       btn.disabled = true;
       submitted = false;
-      show("Opening Primus extension… keep the popup in front.", "ok");
+      show("Starting zkTLS… keep the Primus extension popup in view.", "ok");
       try {
-        if (handle) {
-          try { window.open("https://x.com/" + handle, "alpha-quest-x-profile"); } catch (e) {}
-        }
         const cfg = await fetch("/api/primus/config", { credentials: "include" }).then((r) => r.json());
         if (!cfg.appId) throw new Error("Primus app is not configured");
         const Ctor = window.PrimusZKTLS || window.VoiceSenseZKTLS;
         const zk = new Ctor();
         await zk.init(cfg.appId);
         const request = zk.generateRequestParams(templateId, user.boundAddress);
+        request.setAttMode({ algorithmType: "proxytls" });
         request.setAdditionParams(JSON.stringify({
           taskId: taskId,
           userId: user.id,
-          handle: handle,
-          profileUrl: handle ? ("https://x.com/" + handle) : ""
+          handle: handle
         }));
-        request.setAttMode({ algorithmType: "proxytls" });
         if (typeof request.setAllJsonResponseFlag === "function") {
           request.setAllJsonResponseFlag("true");
         } else {
           request.allJsonResponseFlag = "true";
         }
-        if (handle) {
-          const existingUrl = request.request && request.request.url;
-          const fromCfg = proveCfg && proveCfg.request && proveCfg.request.url;
-          request.request = {
-            url: existingUrl
-              ? swapScreenNameInUrl(existingUrl, handle)
-              : (fromCfg ? swapScreenNameInUrl(fromCfg, handle) : userByScreenNameUrl(handle)),
-            method: "GET",
-            header: "",
-            body: ""
-          };
-        }
-        let unsigned = request.toJsonString();
-        if (handle) unsigned = retargetFollowRequest(unsigned, handle);
+        const unsigned = request.toJsonString();
         const signedRes = await fetch("/api/primus/sign", {
           method: "POST",
           credentials: "include",

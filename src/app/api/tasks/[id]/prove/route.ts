@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { awaitDb, prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { parseTaskConfig, defaultXFollowConfig, normalizeXHandle, defaultTemplateForTask } from "@/lib/task-config";
 import { boundAddress } from "@/lib/identity";
@@ -10,6 +10,7 @@ export async function GET(
   _req: Request,
   { params }: { params: { id: string } }
 ) {
+  await awaitDb();
   const { user } = await requireUser();
   if (!user) return NextResponse.json({ error: "Log in with X or Discord first" }, { status: 401 });
 

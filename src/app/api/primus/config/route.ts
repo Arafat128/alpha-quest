@@ -6,5 +6,6 @@ export async function GET() {
   return NextResponse.json({
     appId: process.env.NEXT_PUBLIC_PRIMUS_APP_ID || process.env.PRIMUS_APP_ID || "",
     followTemplateId: process.env.PRIMUS_TEMPLATE_X_FOLLOW || "",
+    discordInviteUrl: process.env.DISCORD_INVITE_URL || process.env.NEXT_PUBLIC_DISCORD_INVITE || "",
   });
 }

@@ -13,6 +13,7 @@ type Props = {
     handle?: string;
     mention?: string;
     guildId?: string;
+    inviteUrl?: string;
     roleId?: string;
     requiredField?: string;
     request?: PrimusRequest;
@@ -72,7 +73,23 @@ export default function VerifyButton({
         return;
       }
 
-      if (type === "EMAIL_VERIFY" || type === "DISCORD_JOIN" || type === "DISCORD_ROLE") {
+      if (type === "DISCORD_JOIN" || type === "DISCORD_ROLE") {
+        if (!me.user.discordId) {
+          window.location.href = "/api/auth/discord?intent=link";
+          throw new Error("Connect Discord first, then click Verify again.");
+        }
+        const res = await fetch(`/api/tasks/${taskId}/verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Verify failed");
+        onDone?.();
+        return;
+      }
+
+      if (type === "EMAIL_VERIFY") {
         const res = await fetch(`/api/tasks/${taskId}/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },

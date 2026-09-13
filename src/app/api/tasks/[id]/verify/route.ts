@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { awaitDb, prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit";
 import {
@@ -17,6 +17,7 @@ import { Prisma } from "@prisma/client";
 import { boundAddress } from "@/lib/identity";
 import { logAudit, recomputeRisk } from "@/lib/risk";
 import { clientIp } from "@/lib/session";
+import { discordGuildId, fetchDiscordMember } from "@/lib/discord";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export async function POST(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  await awaitDb();
   const { user } = await requireUser();
   if (!user) return NextResponse.json({ error: "Log in with X or Discord first" }, { status: 401 });
 
@@ -65,19 +67,24 @@ export async function POST(
   }
 
   if (task.type === "DISCORD_JOIN" || task.type === "DISCORD_ROLE") {
-    if (process.env.DISCORD_BOT_TOKEN && config.guildId && user.discordId) {
-      const member = await fetchDiscordMember(config.guildId, user.discordId);
-      if (!member.ok) {
-        return NextResponse.json({ error: member.error }, { status: 400 });
-      }
-      if (task.type === "DISCORD_ROLE" && config.roleId) {
-        const roles = Array.isArray(member.roles) ? member.roles : [];
-        if (!roles.includes(config.roleId)) {
-          return NextResponse.json({ error: "Discord role not present" }, { status: 400 });
-        }
-      }
-      return complete(user.id, task, "discord", user.discordId, { source: "discord-bot" }, req);
+    if (!user.discordId) {
+      return NextResponse.json({ error: "Connect Discord on the Account page first" }, { status: 400 });
     }
+    const guildId = discordGuildId(config.guildId);
+    if (!guildId) {
+      return NextResponse.json({ error: "This quest has no Discord server configured" }, { status: 400 });
+    }
+    const member = await fetchDiscordMember(guildId, user.discordId);
+    if (!member.ok) {
+      return NextResponse.json({ error: member.error }, { status: 400 });
+    }
+    if (task.type === "DISCORD_ROLE" && config.roleId) {
+      const roles = Array.isArray(member.roles) ? member.roles : [];
+      if (!roles.includes(config.roleId)) {
+        return NextResponse.json({ error: "That Discord role is not on your account yet" }, { status: 400 });
+      }
+    }
+    return complete(user.id, task, "discord", user.discordId, { source: "discord-bot", guildId }, req);
   }
 
   const attestation = body?.attestation as Record<string, unknown> | undefined;
@@ -140,18 +147,10 @@ export async function POST(
       ((attestation.attRequest as { request?: { url?: string } } | undefined)?.request?.url);
     const attestedHandle =
       extractAttestedXHandle(data, attestation) || xHandleFromRequestUrl(requestUrl || null);
-    if (targetHandle && !attestedHandle) {
-      return NextResponse.json(
-        {
-          error: `Proof did not include which X account was checked. Follow @${targetHandle} on X, then Verify again.`,
-        },
-        { status: 400 }
-      );
-    }
     if (targetHandle && attestedHandle && !sameXHandle(attestedHandle, targetHandle)) {
       return NextResponse.json(
         {
-          error: `This proof is for @${attestedHandle}, but the quest is to follow @${targetHandle}. Stay logged into X and try Verify again.`,
+          error: `This proof is for @${attestedHandle}, but the quest is to follow @${targetHandle}. Follow that account on X, then Verify again.`,
         },
         { status: 400 }
       );
@@ -161,8 +160,9 @@ export async function POST(
     if (!followed && !isOwner) {
       return NextResponse.json(
         {
-          error:
-            "This proof does not show a follow. If you are the account owner, log in with that X account first.",
+          error: targetHandle
+            ? `This proof does not show that you follow @${targetHandle}. Follow them on X, stay logged in, then Verify again.`
+            : "This proof does not show a follow.",
         },
         { status: 400 }
       );
@@ -229,14 +229,4 @@ async function complete(
   }
 }
 
-async function fetchDiscordMember(guildId: string, userId: string) {
-  const token = process.env.DISCORD_BOT_TOKEN;
-  if (!token) return { ok: false as const, error: "Discord bot not configured" };
-  const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
-    headers: { Authorization: `Bot ${token}` },
-  });
-  if (res.status === 404) return { ok: false as const, error: "Not a member of that Discord" };
-  if (!res.ok) return { ok: false as const, error: "Discord API error" };
-  const json = (await res.json()) as { roles?: string[] };
-  return { ok: true as const, roles: json.roles || [] };
-}
+

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { awaitDb, prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { parseTaskConfig, defaultTemplateForTask } from "@/lib/task-config";
+import { discordGuildId, discordInviteUrl } from "@/lib/discord";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ export async function GET(
   _req: Request,
   { params }: { params: { id: string } }
 ) {
+  await awaitDb();
   const campaign = await prisma.campaign.findFirst({
     where: { OR: [{ id: params.id }, { slug: params.id }] },
     include: { tasks: { orderBy: { sortOrder: "asc" } } },
@@ -45,7 +47,8 @@ export async function GET(
         config: {
           handle: config.handle,
           mention: config.mention,
-          guildId: config.guildId,
+          guildId: discordGuildId(config.guildId) || config.guildId,
+          inviteUrl: config.inviteUrl || discordInviteUrl() || undefined,
           roleId: config.roleId,
           requiredField: config.requiredField,
           request: config.request,

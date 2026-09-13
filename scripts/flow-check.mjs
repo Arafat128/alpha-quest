@@ -83,18 +83,17 @@ async function runHost(base) {
     record(host, "GET /zktls-bundle.js", true, r.status);
   });
 
-  await check(host, "GET /prove.html retargets any handle", async () => {
+  await check(host, "GET /prove.html uses Hub template path", async () => {
     const r = await req("/prove.html");
     if (r.status !== 200) throw new Error(`status ${r.status}`);
     const text = await r.text();
-    if (!text.includes("retargetFollowRequest") || !text.includes("UserByScreenName")) {
-      throw new Error("prove.html missing any-handle retarget");
+    if (!text.includes("generateRequestParams") || !text.includes("startAttestation")) {
+      throw new Error("prove.html missing Primus extension flow");
     }
-    if (!text.includes("fieldToggles") || !text.includes("00013")) {
-      throw new Error("prove.html missing complete GraphQL URL or 00013 handling");
+    if (text.includes("retargetFollowRequest") || text.includes("userByScreenNameUrl")) {
+      throw new Error("prove.html still injects a custom GraphQL URL");
     }
-    if (/Hub template for @/.test(text)) throw new Error("prove.html still asks for a per-user Hub template");
-    record(host, "GET /prove.html retargets any handle", true, "ok");
+    record(host, "GET /prove.html uses Hub template path", true, "ok");
   });
 
   await check(host, "GET /api/tasks/x/prove unauth", async () => {
@@ -117,6 +116,10 @@ async function runHost(base) {
     if (r.status !== 200) throw new Error(`status ${r.status} ${JSON.stringify(j)}`);
     const follow = (j.tasks || []).find((t) => t.type === "X_FOLLOW");
     if (follow && !follow.primusTemplateId) throw new Error("X_FOLLOW missing template id");
+    const discord = (j.tasks || []).find((t) => t.type === "DISCORD_JOIN");
+    if (discord && env.DISCORD_GUILD_ID && !discord.config?.guildId) {
+      throw new Error("DISCORD_JOIN missing guild id");
+    }
     record(host, "GET genesis tasks", true, `tasks=${(j.tasks || []).length}`);
   });
 
@@ -228,6 +231,28 @@ async function runHost(base) {
     if (!sample) throw new Error("example_user task not in campaign tasks");
     if (!sample.primusTemplateId) throw new Error("any-handle follow missing shared template id");
     record(host, "POST admin any-handle X_FOLLOW uses shared template", true, sample.primusTemplateId.slice(0, 8));
+  });
+
+  await check(host, "POST admin DISCORD_JOIN uses env guild", async () => {
+    if (!campaignId) throw new Error("no campaign");
+    const r = await req(`/api/admin/campaigns/${campaignId}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "DISCORD_JOIN",
+        title: "Join Discord check",
+        points: 8,
+      }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(JSON.stringify(j));
+    const listed = await req(`/api/campaigns/${campaignId}/tasks`);
+    const body = await listed.json();
+    if (!listed.ok) throw new Error(JSON.stringify(body));
+    const join = (body.tasks || []).find((t) => t.type === "DISCORD_JOIN");
+    if (!join) throw new Error("discord join task missing");
+    if (env.DISCORD_GUILD_ID && !join.config?.guildId) throw new Error("discord join missing guild id");
+    record(host, "POST admin DISCORD_JOIN uses env guild", true, join.config?.guildId ? "guild" : "no-env");
   });
 
   await check(host, "GET /api/admin/users", async () => {

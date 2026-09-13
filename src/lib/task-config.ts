@@ -14,6 +14,7 @@ export type TaskConfig = {
   handle?: string;
   mention?: string;
   guildId?: string;
+  inviteUrl?: string;
   roleId?: string;
   requiredField?: string;
   request?: PrimusRequest;

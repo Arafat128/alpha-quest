@@ -3,12 +3,12 @@ import { getPrimusSigner } from "@/lib/primus";
 import { requireUser } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit";
 import { boundAddress } from "@/lib/identity";
-import { prisma } from "@/lib/prisma";
-import { parseTaskConfig, retargetFollowAttRequest, normalizeXHandle } from "@/lib/task-config";
+import { awaitDb } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  await awaitDb();
   const { user } = await requireUser();
   if (!user) return NextResponse.json({ error: "Log in with X or Discord first" }, { status: 401 });
 
@@ -34,27 +34,6 @@ export async function POST(req: Request) {
   const claimedAddress = String(parsed.userAddress || "");
   if (claimedAddress && claimedAddress.toLowerCase() !== expected.toLowerCase()) {
     return NextResponse.json({ error: "Proof identity does not match session" }, { status: 403 });
-  }
-
-  let addition: Record<string, string> = {};
-  try {
-    const raw = parsed.additionParams;
-    if (typeof raw === "string" && raw.trim()) {
-      addition = JSON.parse(raw) as Record<string, string>;
-    }
-  } catch {
-    addition = {};
-  }
-
-  const taskId = addition.taskId || (typeof body?.taskId === "string" ? body.taskId : "");
-  if (taskId) {
-    const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (task?.type === "X_FOLLOW") {
-      const handle = normalizeXHandle(parseTaskConfig(task.config).handle) || normalizeXHandle(addition.handle);
-      if (handle) retargetFollowAttRequest(parsed, handle);
-    }
-  } else if (addition.handle) {
-    retargetFollowAttRequest(parsed, addition.handle);
   }
 
   try {

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { awaitDb, prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { defaultXFollowConfig, defaultTemplateForTask } from "@/lib/task-config";
+import { discordGuildId } from "@/lib/discord";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export async function POST(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  await awaitDb();
   if (!(await requireAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const campaign = await prisma.campaign.findUnique({ where: { id: params.id } });
@@ -51,7 +53,11 @@ export async function POST(
   } else if (type === "X_POST") {
     config = { mention: (body.mention || "primus_labs").replace(/^@/, "") };
   } else if (type === "DISCORD_JOIN" || type === "DISCORD_ROLE") {
-    config = { guildId: body.guildId || "", roleId: body.roleId || "" };
+    const guildId = discordGuildId(body.guildId);
+    if (!guildId) {
+      return NextResponse.json({ error: "Discord server ID is required" }, { status: 400 });
+    }
+    config = { guildId, roleId: (body.roleId || "").trim() };
   }
 
   const last = await prisma.task.findFirst({

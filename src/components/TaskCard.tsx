@@ -14,6 +14,7 @@ export type TaskView = {
     handle?: string;
     mention?: string;
     guildId?: string;
+    inviteUrl?: string;
     roleId?: string;
     requiredField?: string;
     request?: { url: string; method: string; header?: Record<string, string>; body?: string };
@@ -40,6 +41,20 @@ export default function TaskCard({
           <p className="text-xs uppercase tracking-[0.18em] text-sky-300/80">{task.type}</p>
           <h3 className="mt-2 text-lg font-semibold">{task.title}</h3>
           <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">{task.description}</p>
+          {(task.type === "DISCORD_JOIN" || task.type === "DISCORD_ROLE") && (
+            <p className="mt-2 text-sm text-slate-400">
+              Join the server first. We check Discord membership with the bot
+              {task.config.inviteUrl ? (
+                <>
+                  {" — "}
+                  <a className="text-sky-300 hover:underline" href={task.config.inviteUrl} target="_blank" rel="noreferrer">
+                    open Discord
+                  </a>
+                </>
+              ) : null}
+              .
+            </p>
+          )}
           <p className="mt-3 text-sm text-slate-300">{task.points} pts</p>
         </div>
         <VerifyButton taskId={task.id} {...task} onDone={onDone} />

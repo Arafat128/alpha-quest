@@ -232,7 +232,7 @@ export default function AdminPage() {
           {(taskType === "DISCORD_JOIN" || taskType === "DISCORD_ROLE") && (
             <input
               className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
-              placeholder="Discord guild ID"
+              placeholder="Discord server ID (blank uses DISCORD_GUILD_ID)"
               value={guildId}
               onChange={(e) => setGuildId(e.target.value)}
             />
