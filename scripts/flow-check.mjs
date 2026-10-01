@@ -102,6 +102,9 @@ async function runHost(base) {
     if (!text.includes("UserByScreenName") || !text.includes("wildcardUserByScreenNameUrl")) {
       throw new Error("prove.html missing Hub wildcard Request URL");
     }
+    if (!text.includes("window.close") || !text.includes("alpha-quest-verified")) {
+      throw new Error("prove.html does not close after a successful proof");
+    }
     record(host, "GET /prove.html uses Hub template path", true, "ok");
   });
 

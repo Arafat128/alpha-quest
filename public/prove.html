@@ -150,10 +150,19 @@
         submitted = false;
         throw new Error(verifyJson.error || "Quest rejected the proof");
       }
-      show("Verified. You can close this tab and return to Alpha Quest.", "ok");
+      show("Verified. Returning to Alpha Quest…", "ok");
       try {
-        if (window.opener && !window.opener.closed) window.opener.focus();
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(
+            { type: "alpha-quest-verified", taskId: task },
+            location.origin
+          );
+          window.opener.focus();
+        }
       } catch (e) {}
+      setTimeout(function () {
+        try { window.close(); } catch (e2) {}
+      }, 400);
     }
 
     async function run(user) {

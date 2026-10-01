@@ -111,16 +111,38 @@ export default function VerifyButton({
       }
       setMsg("Complete the Primus popup in the new tab. This page will update when it succeeds.");
 
-      for (let i = 0; i < 90; i++) {
-        await new Promise((r) => setTimeout(r, 2000));
-        const st = await fetch(`/api/tasks/${taskId}`).then((r) => r.json());
-        if (st.status === "verified") {
-          setMsg("");
-          onDone?.();
-          return;
+      const closePopup = () => {
+        try {
+          if (popup && !popup.closed) popup.close();
+        } catch {
+          // ignore
         }
+      };
+
+      const onMsg = (ev: MessageEvent) => {
+        if (ev.origin !== window.location.origin) return;
+        const data = ev.data as { type?: string; taskId?: string } | null;
+        if (data?.type === "alpha-quest-verified" && data.taskId === taskId) {
+          closePopup();
+        }
+      };
+      window.addEventListener("message", onMsg);
+
+      try {
+        for (let i = 0; i < 90; i++) {
+          await new Promise((r) => setTimeout(r, 2000));
+          const st = await fetch(`/api/tasks/${taskId}`).then((r) => r.json());
+          if (st.status === "verified") {
+            closePopup();
+            setMsg("");
+            onDone?.();
+            return;
+          }
+        }
+        setMsg("Still waiting for the Primus tab. Finish the popup, or click Verify again.");
+      } finally {
+        window.removeEventListener("message", onMsg);
       }
-      setMsg("Still waiting for the Primus tab. Finish the popup, or click Verify again.");
     } catch (err) {
       setMsg(errorText(err));
     } finally {
