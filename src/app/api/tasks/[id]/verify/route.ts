@@ -218,12 +218,36 @@ export async function POST(
   }
 
   const platform = task.type.startsWith("DISCORD") ? "discord" : "x";
-  const identity =
-    extractIdentity(data, platform) ||
-    (platform === "x" ? user.xUserId || user.xHandle : user.discordId) ||
-    user.id;
+  const identity = completerIdentity(task.type, user, data);
 
   return complete(user.id, task, platform, identity, attestation, req);
+}
+
+/** Who completed the quest. Follow proofs attest the TARGET profile (e.g. Example), not the follower. */
+function completerIdentity(
+  taskType: string,
+  user: {
+    id: string;
+    xUserId: string | null;
+    xHandle: string | null;
+    discordId: string | null;
+    email: string | null;
+  },
+  data: Record<string, unknown>
+) {
+  if (taskType === "X_FOLLOW") {
+    return user.xUserId || user.xHandle || user.id;
+  }
+  if (taskType === "X_POST") {
+    return user.xUserId || user.xHandle || extractIdentity(data, "x") || user.id;
+  }
+  if (taskType.startsWith("DISCORD")) {
+    return user.discordId || user.id;
+  }
+  if (taskType === "EMAIL_VERIFY") {
+    return user.email || user.id;
+  }
+  return extractIdentity(data, "x") || user.xUserId || user.xHandle || user.id;
 }
 
 async function complete(

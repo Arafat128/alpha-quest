@@ -347,6 +347,10 @@ await check("unit", "in-page verify starts on the campaign page", async () => {
   if (!proveRoute.includes("dataSourceHandle")) {
     throw new Error("prove route missing dataSourceHandle for post quests");
   }
+  const verifyRoute = readFileSync(resolve(ROOT, "src/app/api/tasks/[id]/verify/route.ts"), "utf8");
+  if (!verifyRoute.includes("completerIdentity") || !verifyRoute.includes("taskType === \"X_FOLLOW\"")) {
+    throw new Error("verify still hashes the follow-target screen_name as the completer");
+  }
   record("unit", "in-page verify starts on the campaign page", true, "ok");
 });
 
