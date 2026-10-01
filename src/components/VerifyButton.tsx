@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from "react";
+import { friendlyPrimusError, startPrimusProof } from "@/lib/primus-client";
 import type { PrimusRequest, ResponseResolve } from "@/lib/task-config";
 
 type Props = {
@@ -22,6 +23,10 @@ type Props = {
   onDone?: () => void;
 };
 
+export type VerifyHandle = {
+  start: () => void;
+};
+
 function errorText(err: unknown) {
   if (err instanceof Error && err.message) return err.message;
   if (typeof err === "string" && err) return err;
@@ -32,22 +37,18 @@ function errorText(err: unknown) {
   }
 }
 
-export default function VerifyButton({
-  taskId,
-  type,
-  status,
-  primusTemplateId,
-  config,
-  onDone,
-}: Props) {
+const VerifyButton = forwardRef<VerifyHandle, Props>(function VerifyButton(
+  { taskId, type, status, primusTemplateId, config, onDone },
+  ref
+) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const running = useRef(false);
 
-  if (status === "verified") {
-    return <span className="text-sm font-semibold text-emerald-300">Verified</span>;
-  }
-
-  async function run() {
+  const start = useCallback(async () => {
+    if (status === "verified" || status === "locked") return;
+    if (running.current) return;
+    running.current = true;
     setBusy(true);
     setMsg("");
     try {
@@ -76,7 +77,7 @@ export default function VerifyButton({
       if (type === "DISCORD_JOIN" || type === "DISCORD_ROLE") {
         if (!me.user.discordId) {
           window.location.href = "/api/auth/discord?intent=link";
-          throw new Error("Connect Discord first, then click Verify again.");
+          throw new Error("Connect Discord first, then click the task again.");
         }
         const res = await fetch(`/api/tasks/${taskId}/verify`, {
           method: "POST",
@@ -101,61 +102,49 @@ export default function VerifyButton({
         return;
       }
 
-      const prove = new URL("/prove.html", window.location.origin);
-      prove.searchParams.set("task", taskId);
-      if (primusTemplateId) prove.searchParams.set("template", primusTemplateId);
-      prove.searchParams.set("handle", config.handle || "");
-      const popup = window.open(prove.toString(), "alpha-quest-prove", "popup=yes,width=540,height=760");
-      if (!popup) {
-        throw new Error("Allow popups for Alpha Quest so the Primus extension can open.");
-      }
-      setMsg("Complete the Primus popup in the new tab. This page will update when it succeeds.");
-
-      const closePopup = () => {
-        try {
-          if (popup && !popup.closed) popup.close();
-        } catch {
-          // ignore
-        }
-      };
-
-      const onMsg = (ev: MessageEvent) => {
-        if (ev.origin !== window.location.origin) return;
-        const data = ev.data as { type?: string; taskId?: string } | null;
-        if (data?.type === "alpha-quest-verified" && data.taskId === taskId) {
-          closePopup();
-        }
-      };
-      window.addEventListener("message", onMsg);
-
-      try {
-        for (let i = 0; i < 90; i++) {
-          await new Promise((r) => setTimeout(r, 2000));
-          const st = await fetch(`/api/tasks/${taskId}`).then((r) => r.json());
-          if (st.status === "verified") {
-            closePopup();
-            setMsg("");
-            onDone?.();
-            return;
-          }
-        }
-        setMsg("Still waiting for the Primus tab. Finish the popup, or click Verify again.");
-      } finally {
-        window.removeEventListener("message", onMsg);
-      }
+      await startPrimusProof({
+        taskId,
+        templateId: primusTemplateId,
+        handle: config.handle,
+        user: { id: me.user.id, boundAddress: me.user.boundAddress },
+        onStatus: setMsg,
+      });
+      setMsg("");
+      onDone?.();
     } catch (err) {
-      setMsg(errorText(err));
+      setMsg(friendlyPrimusError(err) || errorText(err));
     } finally {
+      running.current = false;
       setBusy(false);
     }
+  }, [config.handle, onDone, primusTemplateId, status, taskId, type]);
+
+  useImperativeHandle(ref, () => ({ start: () => void start() }), [start]);
+
+  if (status === "verified") {
+    return <span className="text-sm font-semibold text-emerald-300">Verified</span>;
+  }
+
+  if (status === "locked") {
+    return <span className="text-sm font-semibold text-slate-500">Locked</span>;
   }
 
   return (
     <div className="flex flex-col items-end gap-2">
-      <button className="btn-primary" data-testid="verify-btn" disabled={busy} onClick={run}>
-        {busy ? "Waiting…" : "Verify"}
+      <button
+        className="btn-primary"
+        data-testid="verify-btn"
+        disabled={busy}
+        onClick={(e) => {
+          e.stopPropagation();
+          void start();
+        }}
+      >
+        {busy ? "Proving…" : "Verify"}
       </button>
-      {msg && <p className="max-w-xs text-right text-xs text-slate-400">{msg}</p>}
+      {msg ? <p className="max-w-xs text-right text-xs text-slate-400">{msg}</p> : null}
     </div>
   );
-}
+});
+
+export default VerifyButton;

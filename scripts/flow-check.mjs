@@ -1,9 +1,12 @@
 import { readFileSync } from "fs";
-import { resolve } from "path";
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 function loadEnv() {
   const out = {};
-  const text = readFileSync(resolve("D:/grock/Primus labs/primus-quest-platform/.env"), "utf8");
+  const text = readFileSync(resolve(ROOT, ".env"), "utf8");
   for (const line of text.split(/\r?\n/)) {
     const s = line.trim();
     if (!s || s.startsWith("#") || !s.includes("=")) continue;
@@ -312,6 +315,32 @@ await check("unit", "wildcard UserByScreenName request URL", async () => {
   const want = "https://x.com/i/api/graphql/.*/UserByScreenName\\?.*";
   if (next !== want) throw new Error(next);
   record("unit", "wildcard UserByScreenName request URL", true, next);
+});
+
+await check("unit", "in-page verify starts on the campaign page", async () => {
+  const btn = readFileSync(resolve(ROOT, "src/components/VerifyButton.tsx"), "utf8");
+  const client = readFileSync(resolve(ROOT, "src/lib/primus-client.ts"), "utf8");
+  const card = readFileSync(resolve(ROOT, "src/components/TaskCard.tsx"), "utf8");
+  if (btn.includes("prove.html")) throw new Error("VerifyButton still opens prove.html");
+  if (btn.includes("window.open")) throw new Error("VerifyButton still opens a new tab");
+  if (!btn.includes("startPrimusProof")) throw new Error("VerifyButton missing in-page Primus start");
+  if (!client.includes("launch_page")) throw new Error("primus-client missing launch_page");
+  if (!client.includes("generateRequestParams") || !client.includes("startAttestation")) {
+    throw new Error("primus-client missing Primus extension flow");
+  }
+  if (client.includes("retargetFollowRequest") || client.includes("Gb-d6r0vxPOADdG62OEBpQ")) {
+    throw new Error("primus-client still injects a frozen GraphQL query id");
+  }
+  if (!client.includes("UserByScreenName") && !client.includes("wildcardUserByScreenNameUrl")) {
+    throw new Error("primus-client missing Hub wildcard Request URL");
+  }
+  if (/window\.open\(\s*["']https:\/\/x\.com\//.test(client)) {
+    throw new Error("primus-client must not auto-open a second X profile tab");
+  }
+  if (!card.includes("startVerify") || !card.includes("onClick")) {
+    throw new Error("TaskCard does not start verify on click");
+  }
+  record("unit", "in-page verify starts on the campaign page", true, "ok");
 });
 
 const bases = process.argv.slice(2);

@@ -1,6 +1,7 @@
 "use client";
 
-import VerifyButton from "./VerifyButton";
+import { useRef } from "react";
+import VerifyButton, { type VerifyHandle } from "./VerifyButton";
 
 export type TaskView = {
   id: string;
@@ -29,12 +30,23 @@ export default function TaskCard({
   task: TaskView;
   onDone?: () => void;
 }) {
+  const verifyRef = useRef<VerifyHandle>(null);
   const verified = task.status === "verified";
+  const locked = task.status === "locked";
+  const clickable = !verified && !locked;
+
+  function startVerify() {
+    if (!clickable) return;
+    verifyRef.current?.start();
+  }
+
   return (
     <article
+      data-testid="task-card"
+      onClick={clickable ? startVerify : undefined}
       className={`glass hairline rounded-3xl p-6 ${verified ? "glow-verified" : ""} ${
-        task.status === "locked" ? "opacity-40" : ""
-      }`}
+        locked ? "opacity-40" : ""
+      } ${clickable ? "cursor-pointer" : ""}`}
     >
       <div className="flex items-start justify-between gap-6">
         <div>
@@ -47,7 +59,13 @@ export default function TaskCard({
               {task.config.inviteUrl ? (
                 <>
                   {" — "}
-                  <a className="text-sky-300 hover:underline" href={task.config.inviteUrl} target="_blank" rel="noreferrer">
+                  <a
+                    className="text-sky-300 hover:underline"
+                    href={task.config.inviteUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     open Discord
                   </a>
                 </>
@@ -57,7 +75,7 @@ export default function TaskCard({
           )}
           <p className="mt-3 text-sm text-slate-300">{task.points} pts</p>
         </div>
-        <VerifyButton taskId={task.id} {...task} onDone={onDone} />
+        <VerifyButton ref={verifyRef} taskId={task.id} {...task} onDone={onDone} />
       </div>
     </article>
   );
