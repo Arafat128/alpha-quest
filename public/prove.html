@@ -85,11 +85,10 @@
       titleEl.textContent = "Prove you follow @" + handle;
       hintEl.textContent =
         "Stay logged into X. Follow @" + handle +
-        ", then Start proof. Keep the orange Primus popup in front, and stay on @" +
-        handle + "'s profile (not another account).";
+        " first if you have not. Start proof opens one Primus tab — keep the orange popup in front and stay on that tab.";
       openX.hidden = false;
       openX.href = "https://x.com/" + encodeURIComponent(handle);
-      openX.textContent = "Open @" + handle + " on X";
+      openX.textContent = "Follow @" + handle + " on X first";
     }
 
     function friendlyError(err) {
@@ -204,9 +203,9 @@
         const zk = new Ctor();
         zkHandle = zk;
         await zk.init(cfg.appId);
-        if (handle) {
-          try { window.open("https://x.com/" + encodeURIComponent(handle), "alpha-quest-x-profile"); } catch (e) {}
-        }
+        // Primus opens the Hub data-source tab. Do not window.open the quest
+        // profile here — that created a second X page (Hub handle + quest handle).
+        try { openX.hidden = true; } catch (e) {}
         const request = typeof zk.generateRequestParams === "function"
           ? zk.generateRequestParams(templateId, user.boundAddress, { closeDataSourceOnProofComplete: true })
           : null;
@@ -258,6 +257,7 @@
         show(friendlyError(e), "err");
         btn.disabled = false;
         btn.textContent = "Try again";
+        try { if (handle) openX.hidden = false; } catch (e2) {}
       }
     }
   </script>

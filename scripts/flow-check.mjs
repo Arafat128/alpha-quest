@@ -105,6 +105,9 @@ async function runHost(base) {
     if (!text.includes("window.close") || !text.includes("alpha-quest-verified")) {
       throw new Error("prove.html does not close after a successful proof");
     }
+    if (/window\.open\(\s*["']https:\/\/x\.com\//.test(text)) {
+      throw new Error("prove.html must not auto-open a second X profile tab");
+    }
     record(host, "GET /prove.html uses Hub template path", true, "ok");
   });
 

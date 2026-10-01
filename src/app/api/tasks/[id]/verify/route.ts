@@ -170,7 +170,7 @@ export async function POST(
     if (targetHandle && attestedHandle && !sameXHandle(attestedHandle, targetHandle)) {
       return NextResponse.json(
         {
-          error: `This proof is for @${attestedHandle}, but the quest is to follow @${targetHandle}. One Hub template is enough: in Primus Hub set Data source URL to https://x.com/.* (same wildcard idea as Request URL), then Verify again on @${targetHandle}.`,
+          error: `This proof is for @${attestedHandle}, but the quest is to follow @${targetHandle}. Stay on @${targetHandle}'s profile in the tab Primus opens, then Verify again.`,
         },
         { status: 400 }
       );
