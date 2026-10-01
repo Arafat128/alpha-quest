@@ -83,6 +83,7 @@ async function main() {
             primusTemplateId: process.env.PRIMUS_TEMPLATE_DISCORD_JOIN || null,
             config: JSON.stringify({
               guildId: process.env.DISCORD_GUILD_ID || "",
+              inviteUrl: process.env.DISCORD_INVITE_URL || "",
               requiredField: "id",
             }),
             points: 80,

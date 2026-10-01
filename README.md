@@ -2,7 +2,7 @@
 
 Galxe-style campaigns where **X tasks are proven with Primus zkTLS**, not a checkbox. Wallet (SIWE) is the primary account. Completions hash the proven social identity so one X/Discord user cannot farm multiple wallets.
 
-Visual: liquid glass / dark editorial. Stack: Next.js 14 App Router, TypeScript, Tailwind, Prisma (SQLite locally / Postgres in prod), wagmi/viem, Foundry stub for v2 on-chain verify.
+Visual: liquid glass / dark editorial. Stack: Next.js 14 App Router, TypeScript, Tailwind, Prisma + Neon Postgres, wagmi/viem, Foundry stub for v2 on-chain verify.
 
 ## Run locally
 
