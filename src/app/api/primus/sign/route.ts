@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit";
 import { boundAddress } from "@/lib/identity";
 import { awaitDb } from "@/lib/prisma";
+import { wildcardUserByScreenNameUrl } from "@/lib/task-config";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Proof identity does not match session" }, { status: 403 });
   }
 
+  wildcardSignParams(parsed);
+
   try {
     const zk = await getPrimusSigner();
     const signResult = await zk.sign(JSON.stringify(parsed));
@@ -44,4 +47,15 @@ export async function POST(req: Request) {
     const message = error instanceof Error ? error.message : "Sign failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+function wildcardSignParams(parsed: Record<string, unknown>) {
+  const apply = (node: unknown) => {
+    if (!node || typeof node !== "object") return;
+    const rec = node as Record<string, unknown>;
+    if (typeof rec.url === "string") rec.url = wildcardUserByScreenNameUrl(rec.url);
+    if (rec.request && typeof rec.request === "object") apply(rec.request);
+    if (rec.attRequest && typeof rec.attRequest === "object") apply(rec.attRequest);
+  };
+  apply(parsed);
 }

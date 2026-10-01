@@ -11,7 +11,15 @@ import {
   parseAdditionParams,
 } from "@/lib/primus";
 import { hashAttestation, provenIdentityHash } from "@/lib/hash";
-import { parseTaskConfig, sameXHandle, xHandleFromRequestUrl, normalizeXHandle, defaultTemplateForTask } from "@/lib/task-config";
+import {
+  parseTaskConfig,
+  sameXHandle,
+  xHandleFromRequestUrl,
+  normalizeXHandle,
+  defaultTemplateForTask,
+  HUB_X_FOLLOW_TEMPLATE_ID,
+  STALE_X_FOLLOW_TEMPLATE_IDS,
+} from "@/lib/task-config";
 import { verifyOnChain } from "@/lib/onchain-verify";
 import { Prisma } from "@prisma/client";
 import { boundAddress } from "@/lib/identity";
@@ -119,8 +127,20 @@ export async function POST(
       (attestation.attRequest as Record<string, unknown> | undefined)?.attTemplateID ||
       ""
   );
-  if (claimedTemplate && expectedTemplate && claimedTemplate !== expectedTemplate && claimedTemplate !== task.primusTemplateId) {
-    return NextResponse.json({ error: "Template mismatch" }, { status: 400 });
+  if (claimedTemplate && expectedTemplate) {
+    const allowed = new Set(
+      [
+        expectedTemplate,
+        task.primusTemplateId,
+        task.type === "X_FOLLOW" ? HUB_X_FOLLOW_TEMPLATE_ID : "",
+        task.type === "X_FOLLOW" ? process.env.PRIMUS_TEMPLATE_X_FOLLOW : "",
+      ]
+        .filter((value): value is string => Boolean(value && String(value).trim()))
+        .map((value) => String(value).trim())
+    );
+    if (!allowed.has(claimedTemplate) && !STALE_X_FOLLOW_TEMPLATE_IDS.has(claimedTemplate)) {
+      return NextResponse.json({ error: "Template mismatch" }, { status: 400 });
+    }
   }
 
   try {

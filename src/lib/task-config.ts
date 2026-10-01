@@ -47,9 +47,25 @@ export const X_FOLLOW_RESOLVES: ResponseResolve[] = [
   },
   {
     keyName: "following",
-    parsePath: "$.data.user.result.relationship_perspectives.following",
+    parsePath: "$.data.user.result.relationship_counts.following",
   },
 ];
+
+// Hub template "fix user x". Request URL wildcards X's rotating GraphQL query id:
+// https://x.com/i/api/graphql/.* /UserByScreenName\?.*
+export const HUB_X_FOLLOW_TEMPLATE_ID = "674142ce-d852-4c1d-9ca3-3061ace98988";
+
+/** Older Hub templates that baked a query hash and fail with Primus 00013. */
+export const STALE_X_FOLLOW_TEMPLATE_IDS = new Set([
+  "771b3096-cccb-4c6f-bca8-86497ece202b",
+]);
+
+/**
+ * Matcher Primus Hub uses for UserByScreenName. X rotates the GraphQL query
+ * id and query string, so those segments must be `.*` / `\?.*`.
+ */
+export const USER_BY_SCREEN_NAME_REQUEST_PATTERN =
+  "https://x.com/i/api/graphql/.*/UserByScreenName\\?.*";
 
 /** X GraphQL rejects UserByScreenName without these; missing them is Primus 00013. */
 export const USER_BY_SCREEN_NAME_FEATURES = {
@@ -73,28 +89,36 @@ export const USER_BY_SCREEN_NAME_FIELD_TOGGLES = {
   withAuxiliaryUserLabels: true,
 };
 
-export function userByScreenNameQueryId() {
-  return (
-    (typeof process !== "undefined" && process.env?.PRIMUS_X_FOLLOW_QUERY_ID) ||
-    "Gb-d6r0vxPOADdG62OEBpQ"
-  );
+export function resolveXFollowTemplateId(stored?: string | null) {
+  const envId = (process.env.PRIMUS_TEMPLATE_X_FOLLOW || "").trim();
+  const id = (stored && stored.trim()) || envId || HUB_X_FOLLOW_TEMPLATE_ID;
+  if (STALE_X_FOLLOW_TEMPLATE_IDS.has(id)) {
+    if (envId && !STALE_X_FOLLOW_TEMPLATE_IDS.has(envId)) return envId;
+    return HUB_X_FOLLOW_TEMPLATE_ID;
+  }
+  return id;
 }
 
-export function userByScreenNameUrl(handle: string): string {
-  const screen = normalizeXHandle(handle);
-  const variables = JSON.stringify({ screen_name: screen, withGrokTranslatedBio: false });
-  return (
-    `https://x.com/i/api/graphql/${userByScreenNameQueryId()}/UserByScreenName` +
-    `?variables=${encodeURIComponent(variables)}` +
-    `&features=${encodeURIComponent(JSON.stringify(USER_BY_SCREEN_NAME_FEATURES))}` +
-    `&fieldToggles=${encodeURIComponent(JSON.stringify(USER_BY_SCREEN_NAME_FIELD_TOGGLES))}`
-  );
+/** Turn a concrete UserByScreenName URL into the Hub regex matcher. */
+export function wildcardUserByScreenNameUrl(url?: string | null) {
+  if (!url) return USER_BY_SCREEN_NAME_REQUEST_PATTERN;
+  if (/\/i\/api\/graphql\/.*\/UserByScreenName/i.test(url)) {
+    return USER_BY_SCREEN_NAME_REQUEST_PATTERN;
+  }
+  return url;
+}
+
+export function userByScreenNameUrl(_handle?: string): string {
+  return USER_BY_SCREEN_NAME_REQUEST_PATTERN;
 }
 
 export function swapScreenNameInUrl(url: string, handle: string): string {
   const screen = normalizeXHandle(handle);
-  if (!screen) return url;
-  if (!url) return userByScreenNameUrl(screen);
+  if (!screen) return wildcardUserByScreenNameUrl(url);
+  if (!url) return USER_BY_SCREEN_NAME_REQUEST_PATTERN;
+  if (/\/i\/api\/graphql\//i.test(url) && /UserByScreenName/i.test(url)) {
+    return USER_BY_SCREEN_NAME_REQUEST_PATTERN;
+  }
   try {
     const parsed = new URL(url);
     const raw = parsed.searchParams.get("variables");
@@ -103,19 +127,13 @@ export function swapScreenNameInUrl(url: string, handle: string): string {
       if (variables && typeof variables === "object") {
         variables.screen_name = screen;
         parsed.searchParams.set("variables", JSON.stringify(variables));
-        if (!parsed.searchParams.get("features")) {
-          parsed.searchParams.set("features", JSON.stringify(USER_BY_SCREEN_NAME_FEATURES));
-        }
-        if (!parsed.searchParams.get("fieldToggles")) {
-          parsed.searchParams.set("fieldToggles", JSON.stringify(USER_BY_SCREEN_NAME_FIELD_TOGGLES));
-        }
         return parsed.toString();
       }
     }
   } catch {
     // fall through
   }
-  return userByScreenNameUrl(screen);
+  return USER_BY_SCREEN_NAME_REQUEST_PATTERN;
 }
 
 export function xHandleFromRequestUrl(url?: string | null): string | null {
@@ -148,7 +166,7 @@ export function defaultXFollowConfig(handle: string): TaskConfig {
     handle: screen,
     requiredField: "following",
     request: {
-      url: userByScreenNameUrl(screen),
+      url: USER_BY_SCREEN_NAME_REQUEST_PATTERN,
       method: "GET",
       header: {},
       body: "",
@@ -158,17 +176,16 @@ export function defaultXFollowConfig(handle: string): TaskConfig {
 }
 
 export function defaultTemplateForTask(type: string, stored?: string | null) {
+  if (type === "X_FOLLOW") return resolveXFollowTemplateId(stored);
   if (stored && stored.trim()) return stored.trim();
-  if (type === "X_FOLLOW") return process.env.PRIMUS_TEMPLATE_X_FOLLOW || null;
   if (type === "X_POST") return process.env.PRIMUS_TEMPLATE_X_POST || null;
   if (type === "DISCORD_JOIN") return process.env.PRIMUS_TEMPLATE_DISCORD_JOIN || null;
   return null;
 }
 
-/** Inject the admin's X handle into a Hub UserByScreenName attRequest before it is signed. */
+/** Align a Hub UserByScreenName attRequest with the wildcard matcher before it is signed. */
 export function retargetFollowAttRequest(attRequest: Record<string, unknown>, handle: string) {
   const screen = normalizeXHandle(handle);
-  if (!screen) return attRequest;
   const existing = attRequest.request;
   let url = "";
   let header = "";
@@ -182,10 +199,19 @@ export function retargetFollowAttRequest(attRequest: Record<string, unknown>, ha
     if (typeof req.method === "string" && req.method) method = req.method;
   }
   attRequest.request = {
-    url: url ? swapScreenNameInUrl(url, screen) : userByScreenNameUrl(screen),
+    url: wildcardUserByScreenNameUrl(url),
     method,
     header,
     body,
   };
+  if (screen && typeof attRequest.additionParams === "string") {
+    try {
+      const extra = JSON.parse(attRequest.additionParams) as Record<string, unknown>;
+      extra.handle = screen;
+      attRequest.additionParams = JSON.stringify(extra);
+    } catch {
+      // leave additionParams as-is
+    }
+  }
   return attRequest;
 }

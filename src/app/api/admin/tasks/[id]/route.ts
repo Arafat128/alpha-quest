@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
-import { defaultXFollowConfig, parseTaskConfig } from "@/lib/task-config";
+import { defaultXFollowConfig, parseTaskConfig, resolveXFollowTemplateId } from "@/lib/task-config";
 
 export async function PATCH(
   req: Request,
@@ -19,7 +19,8 @@ export async function PATCH(
 
   const data: { primusTemplateId?: string | null; config?: string; title?: string } = {};
   if (typeof body.primusTemplateId === "string") {
-    data.primusTemplateId = body.primusTemplateId.trim() || null;
+    const raw = body.primusTemplateId.trim();
+    data.primusTemplateId = raw ? resolveXFollowTemplateId(raw) : null;
   }
   if (typeof body.title === "string" && body.title.trim()) {
     data.title = body.title.trim();

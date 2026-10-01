@@ -41,6 +41,28 @@
       statusEl.innerHTML = msg ? '<p class="' + (kind || "") + '">' + msg + "</p>" : "";
     }
 
+    // X rotates the GraphQL query id. Hub matches UserByScreenName with this regex.
+    const USER_BY_SCREEN_NAME_REQUEST_PATTERN =
+      "https://x.com/i/api/graphql/.*/UserByScreenName\\?.*";
+
+    function wildcardUserByScreenNameUrl(url) {
+      if (!url || typeof url !== "string") return url;
+      if (/\/i\/api\/graphql\//i.test(url) && /UserByScreenName/i.test(url)) {
+        return USER_BY_SCREEN_NAME_REQUEST_PATTERN;
+      }
+      return url;
+    }
+
+    function applyWildcardRequestUrl(target) {
+      if (!target || typeof target !== "object") return;
+      if (target.request && typeof target.request.url === "string") {
+        target.request.url = wildcardUserByScreenNameUrl(target.request.url);
+      }
+      if (typeof target.url === "string") {
+        target.url = wildcardUserByScreenNameUrl(target.url);
+      }
+    }
+
     function friendlyError(err) {
       const msg = (err && err.message) || (typeof err === "string" ? err : "");
       const code = (err && err.code) || "";
@@ -157,7 +179,17 @@
         } else {
           request.allJsonResponseFlag = "true";
         }
-        const unsigned = request.toJsonString();
+        applyWildcardRequestUrl(request);
+        applyWildcardRequestUrl(request.request);
+        let unsigned = request.toJsonString();
+        try {
+          const parsed = JSON.parse(unsigned);
+          applyWildcardRequestUrl(parsed);
+          applyWildcardRequestUrl(parsed.request);
+          applyWildcardRequestUrl(parsed.attRequest);
+          if (parsed.attRequest) applyWildcardRequestUrl(parsed.attRequest.request);
+          unsigned = JSON.stringify(parsed);
+        } catch (e) {}
         const signedRes = await fetch("/api/primus/sign", {
           method: "POST",
           credentials: "include",

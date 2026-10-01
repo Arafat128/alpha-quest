@@ -7,15 +7,14 @@ function followConfig(screen) {
     requiredField: "following",
     request: {
       url:
-        "https://x.com/i/api/graphql/Gb-d6r0vxPOADdG62OEBpQ/UserByScreenName?variables=" +
-        encodeURIComponent(JSON.stringify({ screen_name: screen, withGrokTranslatedBio: false })),
+        "https://x.com/i/api/graphql/.*/UserByScreenName\\?.*",
       method: "GET",
       header: {},
       body: "",
     },
     responseResolves: [
       { keyName: "screen_name", parsePath: "$.data.user.result.core.screen_name" },
-      { keyName: "following", parsePath: "$.data.user.result.relationship_perspectives.following" },
+      { keyName: "following", parsePath: "$.data.user.result.relationship_counts.following" },
     ],
   };
 }

@@ -28,7 +28,7 @@ Open http://localhost:3000
 - SDK: `@primuslabs/zktls-page-core-sdk` (no Chrome extension). WASM/worker files live in `/public`.
 - Production pattern: `init(appId)` in the browser, `POST /api/primus/sign` on the server.
 - Headers `COOP: same-origin` and `COEP: require-corp` are set for SharedArrayBuffer.
-- Hub **template IDs** are stored on tasks for matching; Page Core still needs `request` + `responseResolves` in task `config` JSON. Point parsePath at `relationship_perspectives.following`, not `relationship_counts.following`.
+- Hub **template IDs** are stored on tasks for matching. X follow uses Hub template `674142ce-d852-4c1d-9ca3-3061ace98988` (`PRIMUS_TEMPLATE_X_FOLLOW`). Its Request URL must wildcard the rotating GraphQL query id: `https://x.com/i/api/graphql/.*/UserByScreenName\?.*`. A frozen query hash cannot be matched and returns Primus 00013.
 - Optional: `PRIMUS_VERIFIER_ADDRESS` + `RPC_URL` for on-chain `verifyAttestation`.
 
 ## Discord

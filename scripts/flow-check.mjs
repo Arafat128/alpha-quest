@@ -16,16 +16,11 @@ function loadEnv() {
 const env = loadEnv();
 const results = [];
 
-function swapScreenNameInUrl(url, screen) {
-  const parsed = new URL(url);
-  const raw = parsed.searchParams.get("variables");
-  const variables = JSON.parse(raw);
-  variables.screen_name = screen;
-  parsed.searchParams.set("variables", JSON.stringify(variables));
-  if (!parsed.searchParams.get("features")) {
-    parsed.searchParams.set("features", JSON.stringify({ hidden_profile_subscriptions_enabled: true }));
+function swapScreenNameInUrl(url, _screen) {
+  if (/\/i\/api\/graphql\//i.test(url) && /UserByScreenName/i.test(url)) {
+    return "https://x.com/i/api/graphql/.*/UserByScreenName\\?.*";
   }
-  return parsed.toString();
+  return url;
 }
 
 function record(host, name, ok, detail) {
@@ -75,6 +70,17 @@ async function runHost(base) {
     record(host, "GET /login", true, r.status);
   });
 
+  await check(host, "GET /api/primus/config follow template", async () => {
+    const r = await req("/api/primus/config");
+    const j = await r.json();
+    if (r.status !== 200) throw new Error(`status ${r.status}`);
+    const id = String(j.followTemplateId || "");
+    if (id !== "674142ce-d852-4c1d-9ca3-3061ace98988") {
+      throw new Error(`expected wildcard Hub template, got ${id || "empty"}`);
+    }
+    record(host, "GET /api/primus/config follow template", true, id.slice(0, 8));
+  });
+
   await check(host, "GET /zktls-bundle.js", async () => {
     const r = await req("/zktls-bundle.js");
     if (r.status !== 200) throw new Error(`status ${r.status}`);
@@ -90,8 +96,11 @@ async function runHost(base) {
     if (!text.includes("generateRequestParams") || !text.includes("startAttestation")) {
       throw new Error("prove.html missing Primus extension flow");
     }
-    if (text.includes("retargetFollowRequest") || text.includes("userByScreenNameUrl")) {
-      throw new Error("prove.html still injects a custom GraphQL URL");
+    if (text.includes("retargetFollowRequest") || text.includes("Gb-d6r0vxPOADdG62OEBpQ")) {
+      throw new Error("prove.html still injects a frozen GraphQL query id");
+    }
+    if (!text.includes("UserByScreenName") || !text.includes("wildcardUserByScreenNameUrl")) {
+      throw new Error("prove.html missing Hub wildcard Request URL");
     }
     record(host, "GET /prove.html uses Hub template path", true, "ok");
   });
@@ -286,16 +295,14 @@ async function runHost(base) {
   });
 }
 
-await check("unit", "retarget UserByScreenName screen_name", async () => {
+await check("unit", "wildcard UserByScreenName request URL", async () => {
   const url =
     "https://x.com/i/api/graphql/Gb-d6r0vxPOADdG62OEBpQ/UserByScreenName?variables=" +
     encodeURIComponent(JSON.stringify({ screen_name: "example_owner", withGrokTranslatedBio: false }));
   const next = swapScreenNameInUrl(url, "example_user");
-  const parsed = new URL(next);
-  const variables = JSON.parse(parsed.searchParams.get("variables"));
-  if (variables.screen_name !== "example_user") throw new Error(JSON.stringify(variables));
-  if (!parsed.searchParams.get("features")) throw new Error("missing features query (causes Primus 00013)");
-  record("unit", "retarget UserByScreenName screen_name", true, variables.screen_name);
+  const want = "https://x.com/i/api/graphql/.*/UserByScreenName\\?.*";
+  if (next !== want) throw new Error(next);
+  record("unit", "wildcard UserByScreenName request URL", true, next);
 });
 
 const bases = process.argv.slice(2);

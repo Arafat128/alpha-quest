@@ -6,11 +6,7 @@ const xFollowConfig = {
   handle: "example_owner",
   requiredField: "following",
   request: {
-    url:
-      "https://x.com/i/api/graphql/Gb-d6r0vxPOADdG62OEBpQ/UserByScreenName?variables=" +
-      encodeURIComponent(
-        JSON.stringify({ screen_name: "example_owner", withGrokTranslatedBio: false })
-      ),
+    url: "https://x.com/i/api/graphql/.*/UserByScreenName\\?.*",
     method: "GET",
     header: {},
     body: "",
@@ -22,7 +18,7 @@ const xFollowConfig = {
     },
     {
       keyName: "following",
-      parsePath: "$.data.user.result.relationship_perspectives.following",
+      parsePath: "$.data.user.result.relationship_counts.following",
     },
   ],
 };

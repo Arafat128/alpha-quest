@@ -223,7 +223,7 @@ export default function AdminPage() {
               />
               <input
                 className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm md:col-span-2"
-                placeholder="Optional: override Primus template ID (leave blank — one template works for every X handle)"
+                placeholder="Optional Hub template ID (blank uses the wildcard UserByScreenName template)"
                 value={primusTemplateId}
                 onChange={(e) => setPrimusTemplateId(e.target.value)}
               />
@@ -389,7 +389,7 @@ function TaskTemplateField({
     <div className="mt-2">
       <input
         className="w-full rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-xs"
-        placeholder="Optional template override (blank uses the shared follow template)"
+        placeholder="Hub template ID — Request URL must be https://x.com/i/api/graphql/.*/UserByScreenName\?.*"
         value={value}
         onChange={(e) => setValue(e.target.value)}
       />
