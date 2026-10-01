@@ -74,6 +74,27 @@ function wildcardSignParams(parsed: Record<string, unknown>) {
   } catch {
     handle = "";
   }
+  if (handle) {
+    const launchPage = `https://x.com/${handle}`;
+    const mergeLaunch = (raw: unknown) => {
+      let extra: Record<string, unknown> = {};
+      if (typeof raw === "string") {
+        try {
+          extra = JSON.parse(raw) as Record<string, unknown>;
+        } catch {
+          extra = {};
+        }
+      } else if (raw && typeof raw === "object") {
+        extra = { ...(raw as Record<string, unknown>) };
+      }
+      extra.handle = handle;
+      extra.launch_page = launchPage;
+      return JSON.stringify(extra);
+    };
+    if ("additionParams" in parsed) {
+      parsed.additionParams = mergeLaunch(parsed.additionParams);
+    }
+  }
   const apply = (node: unknown) => {
     if (!node || typeof node !== "object") return;
     const rec = node as Record<string, unknown>;

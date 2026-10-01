@@ -85,7 +85,8 @@
       titleEl.textContent = "Prove you follow @" + handle;
       hintEl.textContent =
         "Stay logged into X. Follow @" + handle +
-        " first if you have not. Start proof opens one Primus tab — keep the orange popup in front and stay on that tab.";
+        " first if you have not. Start proof opens @" + handle +
+        "'s profile in one Primus tab — keep the orange popup in front and stay on that tab.";
       openX.hidden = false;
       openX.href = "https://x.com/" + encodeURIComponent(handle);
       openX.textContent = "Follow @" + handle + " on X first";
@@ -214,11 +215,11 @@
           request.setCloseDataSourceOnProofComplete(true);
         }
         request.setAttMode({ algorithmType: "proxytls" });
-        request.setAdditionParams(JSON.stringify({
-          taskId: taskId,
-          userId: user.id,
-          handle: handle
-        }));
+        // Primus extension uses additionParams.launch_page as chrome.tabs.create
+        // URL, overriding Hub dataPageTemplate.baseUrl (otherwise always Example).
+        const extra = { taskId: taskId, userId: user.id, handle: handle };
+        if (handle) extra.launch_page = "https://x.com/" + handle;
+        request.setAdditionParams(JSON.stringify(extra));
         if (typeof request.setAllJsonResponseFlag === "function") {
           request.setAllJsonResponseFlag("true");
         } else {

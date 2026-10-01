@@ -108,6 +108,9 @@ async function runHost(base) {
     if (/window\.open\(\s*["']https:\/\/x\.com\//.test(text)) {
       throw new Error("prove.html must not auto-open a second X profile tab");
     }
+    if (!text.includes("launch_page")) {
+      throw new Error("prove.html missing Primus launch_page data-source override");
+    }
     record(host, "GET /prove.html uses Hub template path", true, "ok");
   });
 
