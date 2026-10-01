@@ -28,7 +28,7 @@ Open http://localhost:3000
 - SDK: `@primuslabs/zktls-page-core-sdk` (no Chrome extension). WASM/worker files live in `/public`.
 - Production pattern: `init(appId)` in the browser, `POST /api/primus/sign` on the server.
 - Headers `COOP: same-origin` and `COEP: require-corp` are set for SharedArrayBuffer.
-- Hub **template IDs** are stored on tasks for matching. X follow uses Hub template `674142ce-d852-4c1d-9ca3-3061ace98988` (`PRIMUS_TEMPLATE_X_FOLLOW`). Its Request URL must wildcard the rotating GraphQL query id: `https://x.com/i/api/graphql/.*/UserByScreenName\?.*`. A frozen query hash cannot be matched and returns Primus 00013.
+- Hub **template IDs** are stored on tasks for matching. X follow uses one Hub template (`674142ce-d852-4c1d-9ca3-3061ace98988` / `PRIMUS_TEMPLATE_X_FOLLOW`) for every handle. Request URL must be `https://x.com/i/api/graphql/.*/UserByScreenName\?.*`. Data source URL must be `https://x.com/.*` so proofs are not locked to one username. A frozen query hash returns Primus 00013.
 - Optional: `PRIMUS_VERIFIER_ADDRESS` + `RPC_URL` for on-chain `verifyAttestation`.
 
 ## Discord

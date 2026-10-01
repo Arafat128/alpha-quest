@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit";
 import { boundAddress } from "@/lib/identity";
 import { awaitDb } from "@/lib/prisma";
-import { wildcardUserByScreenNameUrl } from "@/lib/task-config";
+import { normalizeXHandle, wildcardUserByScreenNameUrl } from "@/lib/task-config";
 
 export const dynamic = "force-dynamic";
 
@@ -49,11 +49,36 @@ export async function POST(req: Request) {
   }
 }
 
+function rewriteUrl(url: string, handle: string) {
+  const wild = wildcardUserByScreenNameUrl(url);
+  if (wild !== url) return wild;
+  if (!handle) return url;
+  const match = url.match(
+    /^(https:\/\/(?:www\.)?(?:x|twitter)\.com\/)(?!i\/)([A-Za-z0-9_]+)\/?(\?.*)?$/i
+  );
+  if (!match) return url;
+  return match[1] + handle + (match[3] || "");
+}
+
 function wildcardSignParams(parsed: Record<string, unknown>) {
+  let handle = "";
+  try {
+    const raw = parsed.additionParams;
+    const extra =
+      typeof raw === "string"
+        ? (JSON.parse(raw) as { handle?: string })
+        : raw && typeof raw === "object"
+          ? (raw as { handle?: string })
+          : null;
+    handle = normalizeXHandle(extra?.handle);
+  } catch {
+    handle = "";
+  }
   const apply = (node: unknown) => {
     if (!node || typeof node !== "object") return;
     const rec = node as Record<string, unknown>;
-    if (typeof rec.url === "string") rec.url = wildcardUserByScreenNameUrl(rec.url);
+    if (typeof rec.url === "string") rec.url = rewriteUrl(rec.url, handle);
+    if (typeof rec.backUrl === "string") rec.backUrl = rewriteUrl(rec.backUrl, handle);
     if (rec.request && typeof rec.request === "object") apply(rec.request);
     if (rec.attRequest && typeof rec.attRequest === "object") apply(rec.attRequest);
   };

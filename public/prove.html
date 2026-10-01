@@ -11,6 +11,7 @@
     .muted { color:#94a3b8; font-size:.95rem; line-height:1.5; }
     button { margin-top: 1rem; background: linear-gradient(135deg,#0ea5e9,#6366f1); color:#fff; border:0; border-radius:12px; padding:.75rem 1.1rem; font-weight:600; cursor:pointer; }
     button:disabled { opacity:.4; cursor:not-allowed; }
+    a.xlink { display:inline-block; margin-top: .75rem; color:#7dd3fc; }
     .ok { color:#6ee7b7; margin-top:1rem; }
     .err { color:#fca5a5; margin-top:1rem; }
   </style>
@@ -20,6 +21,7 @@
     <p class="muted">Primus extension</p>
     <h1 id="title">Prove with Primus</h1>
     <p class="muted" id="hint">Stay logged into X in this Chrome profile. Click Start proof, then keep the orange Primus popup in front until it finishes.</p>
+    <a class="xlink" id="openx" hidden target="_blank" rel="noreferrer">Open the X profile</a>
     <div id="status"></div>
     <button id="prove" disabled>Start proof</button>
   </div>
@@ -33,6 +35,7 @@
     const btn = document.getElementById("prove");
     const titleEl = document.getElementById("title");
     const hintEl = document.getElementById("hint");
+    const openX = document.getElementById("openx");
     let submitted = false;
     let zkHandle = null;
     let requestid = null;
@@ -53,14 +56,40 @@
       return url;
     }
 
+    function retargetDataSourceUrl(url) {
+      if (!url || typeof url !== "string") return url;
+      if (/\/i\/api\/graphql\//i.test(url) || /UserByScreenName/i.test(url)) {
+        return wildcardUserByScreenNameUrl(url);
+      }
+      if (!handle) return url;
+      const match = url.match(/^(https:\/\/(?:www\.)?(?:x|twitter)\.com\/)(?!i\/)([A-Za-z0-9_]+)\/?(\?.*)?$/i);
+      if (!match) return url;
+      return match[1] + handle + (match[3] || "");
+    }
+
     function applyWildcardRequestUrl(target) {
       if (!target || typeof target !== "object") return;
       if (target.request && typeof target.request.url === "string") {
-        target.request.url = wildcardUserByScreenNameUrl(target.request.url);
+        target.request.url = retargetDataSourceUrl(target.request.url);
       }
       if (typeof target.url === "string") {
-        target.url = wildcardUserByScreenNameUrl(target.url);
+        target.url = retargetDataSourceUrl(target.url);
       }
+      if (typeof target.backUrl === "string") {
+        target.backUrl = retargetDataSourceUrl(target.backUrl);
+      }
+    }
+
+    function setHandleHint() {
+      if (!handle) return;
+      titleEl.textContent = "Prove you follow @" + handle;
+      hintEl.textContent =
+        "Stay logged into X. Follow @" + handle +
+        ", then Start proof. Keep the orange Primus popup in front, and stay on @" +
+        handle + "'s profile (not another account).";
+      openX.hidden = false;
+      openX.href = "https://x.com/" + encodeURIComponent(handle);
+      openX.textContent = "Open @" + handle + " on X";
     }
 
     function friendlyError(err) {
@@ -82,10 +111,7 @@
       return msg || String(err);
     }
 
-    if (handle) {
-      titleEl.textContent = "Prove you follow @" + handle;
-      hintEl.textContent = "Stay logged into X. Follow @" + handle + " if you have not. Click Start proof and keep the orange Primus popup in front until it finishes.";
-    }
+    setHandleHint();
 
     (async function ready() {
       try {
@@ -100,10 +126,7 @@
           if (cfgRes.ok) {
             if (proveCfg.handle) handle = proveCfg.handle;
             if (proveCfg.templateId) templateId = proveCfg.templateId;
-            if (handle) {
-              titleEl.textContent = "Prove you follow @" + handle;
-              hintEl.textContent = "Stay logged into X. Follow @" + handle + " if you have not. Click Start proof and keep the orange Primus popup in front until it finishes.";
-            }
+            setHandleHint();
           }
         }
         if (!templateId) {
@@ -152,6 +175,11 @@
       }
       show("Verified. Returning to Alpha Quest…", "ok");
       try {
+        if (zkHandle && typeof zkHandle.closeDataSourceTab === "function") {
+          zkHandle.closeDataSourceTab();
+        }
+      } catch (e) {}
+      try {
         if (window.opener && !window.opener.closed) {
           window.opener.postMessage(
             { type: "alpha-quest-verified", taskId: task },
@@ -176,7 +204,16 @@
         const zk = new Ctor();
         zkHandle = zk;
         await zk.init(cfg.appId);
-        const request = zk.generateRequestParams(templateId, user.boundAddress);
+        if (handle) {
+          try { window.open("https://x.com/" + encodeURIComponent(handle), "alpha-quest-x-profile"); } catch (e) {}
+        }
+        const request = typeof zk.generateRequestParams === "function"
+          ? zk.generateRequestParams(templateId, user.boundAddress, { closeDataSourceOnProofComplete: true })
+          : null;
+        if (!request) throw new Error("Primus SDK missing generateRequestParams");
+        if (typeof request.setCloseDataSourceOnProofComplete === "function") {
+          request.setCloseDataSourceOnProofComplete(true);
+        }
         request.setAttMode({ algorithmType: "proxytls" });
         request.setAdditionParams(JSON.stringify({
           taskId: taskId,
