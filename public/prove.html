@@ -31,6 +31,7 @@
     const taskId = q.get("task") || "";
     let templateId = q.get("template") || "";
     let handle = (q.get("handle") || "").replace(/^@/, "");
+    let taskType = "";
     const statusEl = document.getElementById("status");
     const btn = document.getElementById("prove");
     const titleEl = document.getElementById("title");
@@ -47,6 +48,8 @@
     // X rotates the GraphQL query id. Hub matches UserByScreenName with this regex.
     const USER_BY_SCREEN_NAME_REQUEST_PATTERN =
       "https://x.com/i/api/graphql/.*/UserByScreenName\\?.*";
+    const USER_TWEETS_REQUEST_PATTERN =
+      "https://x.com/i/api/graphql/.*/UserTweets\\?.*";
 
     function wildcardUserByScreenNameUrl(url) {
       if (!url || typeof url !== "string") return url;
@@ -58,6 +61,11 @@
 
     function retargetDataSourceUrl(url) {
       if (!url || typeof url !== "string") return url;
+      if (taskType === "X_POST" && /\/i\/api\/graphql\//i.test(url)) {
+        if (/UserByScreenName/i.test(url) || /UserTweets/i.test(url)) {
+          return USER_TWEETS_REQUEST_PATTERN;
+        }
+      }
       if (/\/i\/api\/graphql\//i.test(url) || /UserByScreenName/i.test(url)) {
         return wildcardUserByScreenNameUrl(url);
       }
@@ -82,6 +90,16 @@
 
     function setHandleHint() {
       if (!handle) return;
+      if (taskType === "X_POST") {
+        titleEl.textContent = "Prove a post from @" + handle;
+        hintEl.textContent =
+          "Stay logged into X. Start proof opens your profile @" + handle +
+          " in one Primus tab — keep the orange popup in front and stay on that tab.";
+        openX.hidden = false;
+        openX.href = "https://x.com/" + encodeURIComponent(handle);
+        openX.textContent = "Open your profile @" + handle;
+        return;
+      }
       titleEl.textContent = "Prove you follow @" + handle;
       hintEl.textContent =
         "Stay logged into X. Follow @" + handle +
@@ -124,6 +142,7 @@
           const cfgRes = await fetch("/api/tasks/" + encodeURIComponent(taskId) + "/prove", { credentials: "include" });
           const proveCfg = await cfgRes.json();
           if (cfgRes.ok) {
+            if (proveCfg.type) taskType = proveCfg.type;
             if (proveCfg.handle) handle = proveCfg.handle;
             if (proveCfg.templateId) templateId = proveCfg.templateId;
             setHandleHint();

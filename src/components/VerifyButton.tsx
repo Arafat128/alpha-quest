@@ -102,10 +102,16 @@ const VerifyButton = forwardRef<VerifyHandle, Props>(function VerifyButton(
         return;
       }
 
+      if (type === "X_POST" && !me.user.xHandle) {
+        window.location.href = "/api/auth/x?intent=link";
+        throw new Error("Connect X first, then click the task again.");
+      }
+
       await startPrimusProof({
         taskId,
         templateId: primusTemplateId,
-        handle: config.handle,
+        handle: type === "X_POST" ? me.user.xHandle : config.handle,
+        taskType: type,
         user: { id: me.user.id, boundAddress: me.user.boundAddress },
         onStatus: setMsg,
       });

@@ -27,8 +27,7 @@ const xPostConfig = {
   mention: "primus_labs",
   requiredField: "full_text",
   request: {
-    url: "https://x.com/i/api/graphql/V7H0Ap3_Hh2FyS75OCZWGo/UserTweets?variables=" +
-      encodeURIComponent(JSON.stringify({ count: 20, includePromotedContent: false })),
+    url: "https://x.com/i/api/graphql/.*/UserTweets\\?.*",
     method: "GET",
     header: {},
     body: "",

@@ -67,6 +67,10 @@ export const STALE_X_FOLLOW_TEMPLATE_IDS = new Set([
 export const USER_BY_SCREEN_NAME_REQUEST_PATTERN =
   "https://x.com/i/api/graphql/.*/UserByScreenName\\?.*";
 
+// Hub matcher for a user's tweet timeline. X rotates the query id the same way.
+export const USER_TWEETS_REQUEST_PATTERN =
+  "https://x.com/i/api/graphql/.*/UserTweets\\?.*";
+
 /** X GraphQL rejects UserByScreenName without these; missing them is Primus 00013. */
 export const USER_BY_SCREEN_NAME_FEATURES = {
   hidden_profile_subscriptions_enabled: true,
@@ -106,6 +110,30 @@ export function wildcardUserByScreenNameUrl(url?: string | null) {
     return USER_BY_SCREEN_NAME_REQUEST_PATTERN;
   }
   return url;
+}
+
+/** Turn a concrete X GraphQL URL into a Hub regex matcher for that operation. */
+export function wildcardXGraphqlUrl(url?: string | null) {
+  if (!url) return url || "";
+  const match = url.match(
+    /^https:\/\/(?:www\.)?(?:x|twitter)\.com\/i\/api\/graphql\/[^/]+\/([A-Za-z0-9_]+)(?:\?.*)?$/i
+  );
+  if (!match) return url;
+  const operation = match[1];
+  if (/^UserByScreenName$/i.test(operation)) return USER_BY_SCREEN_NAME_REQUEST_PATTERN;
+  if (/^UserTweets$/i.test(operation)) return USER_TWEETS_REQUEST_PATTERN;
+  return `https://x.com/i/api/graphql/.*/${operation}\\?.*`;
+}
+
+/** Profile tab Primus should open. Follow quests use the target; post quests use the logged-in user. */
+export function dataSourceHandle(
+  type: string,
+  config: TaskConfig,
+  userHandle?: string | null
+) {
+  if (type === "X_FOLLOW") return normalizeXHandle(config.handle);
+  if (type === "X_POST") return normalizeXHandle(userHandle);
+  return normalizeXHandle(config.handle) || normalizeXHandle(userHandle);
 }
 
 export function userByScreenNameUrl(_handle?: string): string {
@@ -178,7 +206,9 @@ export function defaultXFollowConfig(handle: string): TaskConfig {
 export function defaultTemplateForTask(type: string, stored?: string | null) {
   if (type === "X_FOLLOW") return resolveXFollowTemplateId(stored);
   if (stored && stored.trim()) return stored.trim();
-  if (type === "X_POST") return process.env.PRIMUS_TEMPLATE_X_POST || null;
+  if (type === "X_POST") {
+    return (process.env.PRIMUS_TEMPLATE_X_POST || "").trim() || resolveXFollowTemplateId(null);
+  }
   if (type === "DISCORD_JOIN") return process.env.PRIMUS_TEMPLATE_DISCORD_JOIN || null;
   return null;
 }

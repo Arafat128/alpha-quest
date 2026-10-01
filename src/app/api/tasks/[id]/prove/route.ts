@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { awaitDb, prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
-import { parseTaskConfig, defaultXFollowConfig, normalizeXHandle, defaultTemplateForTask } from "@/lib/task-config";
+import {
+  parseTaskConfig,
+  defaultXFollowConfig,
+  defaultTemplateForTask,
+  dataSourceHandle,
+} from "@/lib/task-config";
 import { boundAddress } from "@/lib/identity";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +23,10 @@ export async function GET(
   if (!task) return NextResponse.json({ error: "Unknown task" }, { status: 404 });
 
   const config = parseTaskConfig(task.config);
-  const handle = normalizeXHandle(config.handle);
+  const handle = dataSourceHandle(task.type, config, user.xHandle);
+  if (task.type === "X_POST" && !handle) {
+    return NextResponse.json({ error: "Log in with X first" }, { status: 400 });
+  }
   const follow = task.type === "X_FOLLOW" && handle ? defaultXFollowConfig(handle) : null;
 
   return NextResponse.json({

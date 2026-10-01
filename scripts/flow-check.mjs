@@ -337,8 +337,15 @@ await check("unit", "in-page verify starts on the campaign page", async () => {
   if (/window\.open\(\s*["']https:\/\/x\.com\//.test(client)) {
     throw new Error("primus-client must not auto-open a second X profile tab");
   }
+  if (!client.includes("USER_TWEETS_REQUEST_PATTERN") || !client.includes("X_POST")) {
+    throw new Error("primus-client missing X post data-source retarget");
+  }
   if (!card.includes("startVerify") || !card.includes("onClick")) {
     throw new Error("TaskCard does not start verify on click");
+  }
+  const proveRoute = readFileSync(resolve(ROOT, "src/app/api/tasks/[id]/prove/route.ts"), "utf8");
+  if (!proveRoute.includes("dataSourceHandle")) {
+    throw new Error("prove route missing dataSourceHandle for post quests");
   }
   record("unit", "in-page verify starts on the campaign page", true, "ok");
 });

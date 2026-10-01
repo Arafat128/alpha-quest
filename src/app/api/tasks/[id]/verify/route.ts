@@ -190,10 +190,30 @@ export async function POST(
       );
     }
   }
-  if (task.type === "X_POST" && config.mention) {
-    const blob = JSON.stringify(data).toLowerCase();
-    if (!blob.includes(config.mention.toLowerCase())) {
-      return NextResponse.json({ error: `Post proof does not mention ${config.mention}` }, { status: 400 });
+  if (task.type === "X_POST") {
+    const requestUrl =
+      (attestation.request as { url?: string } | undefined)?.url ||
+      ((attestation.attRequest as { request?: { url?: string } } | undefined)?.request?.url);
+    const attestedHandle =
+      extractAttestedXHandle(data, attestation) || xHandleFromRequestUrl(requestUrl || null);
+    if (user.xHandle && attestedHandle && !sameXHandle(attestedHandle, user.xHandle)) {
+      return NextResponse.json(
+        {
+          error: `This proof is for @${attestedHandle}, but this quest verifies your posts. Stay on your profile @${user.xHandle} in the tab Primus opens, then Verify again.`,
+        },
+        { status: 400 }
+      );
+    }
+    if (config.mention) {
+      const blob = JSON.stringify({ data, extras }).toLowerCase();
+      if (!blob.includes(config.mention.toLowerCase())) {
+        return NextResponse.json(
+          {
+            error: `Post proof does not mention ${config.mention}. Post on X mentioning @${config.mention}, stay on your profile, then Verify again.`,
+          },
+          { status: 400 }
+        );
+      }
     }
   }
 

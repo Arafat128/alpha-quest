@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { awaitDb, prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
-import { defaultXFollowConfig, defaultTemplateForTask } from "@/lib/task-config";
+import { defaultXFollowConfig, defaultTemplateForTask, USER_TWEETS_REQUEST_PATTERN } from "@/lib/task-config";
 import { discordGuildId } from "@/lib/discord";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +51,11 @@ export async function POST(
   if (type === "X_FOLLOW") {
     config = defaultXFollowConfig(handle);
   } else if (type === "X_POST") {
-    config = { mention: (body.mention || "primus_labs").replace(/^@/, "") };
+    config = {
+      mention: (body.mention || "primus_labs").replace(/^@/, ""),
+      requiredField: "full_text",
+      request: { url: USER_TWEETS_REQUEST_PATTERN, method: "GET", header: {}, body: "" },
+    };
   } else if (type === "DISCORD_JOIN" || type === "DISCORD_ROLE") {
     const guildId = discordGuildId(body.guildId);
     if (!guildId) {

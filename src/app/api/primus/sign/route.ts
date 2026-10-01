@@ -3,8 +3,15 @@ import { getPrimusSigner } from "@/lib/primus";
 import { requireUser } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit";
 import { boundAddress } from "@/lib/identity";
-import { awaitDb } from "@/lib/prisma";
-import { normalizeXHandle, wildcardUserByScreenNameUrl } from "@/lib/task-config";
+import { awaitDb, prisma } from "@/lib/prisma";
+import {
+  dataSourceHandle,
+  normalizeXHandle,
+  parseTaskConfig,
+  USER_TWEETS_REQUEST_PATTERN,
+  wildcardUserByScreenNameUrl,
+  wildcardXGraphqlUrl,
+} from "@/lib/task-config";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +44,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Proof identity does not match session" }, { status: 403 });
   }
 
-  wildcardSignParams(parsed);
+  const taskId = typeof body?.taskId === "string" ? body.taskId : "";
+  let taskType = "";
+  let configHandle = "";
+  if (taskId) {
+    const task = await prisma.task.findUnique({ where: { id: taskId } });
+    if (task) {
+      taskType = task.type;
+      configHandle = normalizeXHandle(parseTaskConfig(task.config).handle);
+    }
+  }
+
+  wildcardSignParams(parsed, {
+    taskType,
+    questHandle: configHandle,
+    userHandle: normalizeXHandle(user.xHandle),
+  });
 
   try {
     const zk = await getPrimusSigner();
@@ -49,9 +71,20 @@ export async function POST(req: Request) {
   }
 }
 
-function rewriteUrl(url: string, handle: string) {
-  const wild = wildcardUserByScreenNameUrl(url);
-  if (wild !== url) return wild;
+function rewriteUrl(url: string, handle: string, taskType: string) {
+  if (taskType === "X_POST") {
+    if (/\/i\/api\/graphql\//i.test(url)) {
+      if (/UserByScreenName/i.test(url) || /UserTweets/i.test(url)) {
+        return USER_TWEETS_REQUEST_PATTERN;
+      }
+      return wildcardXGraphqlUrl(url);
+    }
+  } else {
+    const named = wildcardUserByScreenNameUrl(url);
+    if (named !== url) return named;
+    const wild = wildcardXGraphqlUrl(url);
+    if (wild !== url) return wild;
+  }
   if (!handle) return url;
   const match = url.match(
     /^(https:\/\/(?:www\.)?(?:x|twitter)\.com\/)(?!i\/)([A-Za-z0-9_]+)\/?(\?.*)?$/i
@@ -60,8 +93,11 @@ function rewriteUrl(url: string, handle: string) {
   return match[1] + handle + (match[3] || "");
 }
 
-function wildcardSignParams(parsed: Record<string, unknown>) {
-  let handle = "";
+function wildcardSignParams(
+  parsed: Record<string, unknown>,
+  ctx: { taskType: string; questHandle: string; userHandle: string }
+) {
+  let extraHandle = "";
   try {
     const raw = parsed.additionParams;
     const extra =
@@ -70,10 +106,17 @@ function wildcardSignParams(parsed: Record<string, unknown>) {
         : raw && typeof raw === "object"
           ? (raw as { handle?: string })
           : null;
-    handle = normalizeXHandle(extra?.handle);
+    extraHandle = normalizeXHandle(extra?.handle);
   } catch {
-    handle = "";
+    extraHandle = "";
   }
+
+  const handle = dataSourceHandle(
+    ctx.taskType || (ctx.questHandle ? "X_FOLLOW" : "X_POST"),
+    { handle: ctx.questHandle || extraHandle },
+    ctx.userHandle || extraHandle
+  );
+
   if (handle) {
     const launchPage = `https://x.com/${handle}`;
     const mergeLaunch = (raw: unknown) => {
@@ -98,8 +141,8 @@ function wildcardSignParams(parsed: Record<string, unknown>) {
   const apply = (node: unknown) => {
     if (!node || typeof node !== "object") return;
     const rec = node as Record<string, unknown>;
-    if (typeof rec.url === "string") rec.url = rewriteUrl(rec.url, handle);
-    if (typeof rec.backUrl === "string") rec.backUrl = rewriteUrl(rec.backUrl, handle);
+    if (typeof rec.url === "string") rec.url = rewriteUrl(rec.url, handle, ctx.taskType);
+    if (typeof rec.backUrl === "string") rec.backUrl = rewriteUrl(rec.backUrl, handle, ctx.taskType);
     if (rec.request && typeof rec.request === "object") apply(rec.request);
     if (rec.attRequest && typeof rec.attRequest === "object") apply(rec.attRequest);
   };

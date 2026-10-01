@@ -1,4 +1,9 @@
-import { normalizeXHandle, wildcardUserByScreenNameUrl } from "./task-config";
+import {
+  normalizeXHandle,
+  USER_TWEETS_REQUEST_PATTERN,
+  wildcardUserByScreenNameUrl,
+  wildcardXGraphqlUrl,
+} from "./task-config";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -34,10 +39,18 @@ declare global {
   }
 }
 
-function retargetDataSourceUrl(url: string, handle: string) {
+function retargetDataSourceUrl(url: string, handle: string, taskType: string) {
+  if (taskType === "X_POST" && /\/i\/api\/graphql\//i.test(url)) {
+    if (/UserByScreenName/i.test(url) || /UserTweets/i.test(url)) {
+      return USER_TWEETS_REQUEST_PATTERN;
+    }
+    return wildcardXGraphqlUrl(url);
+  }
   if (/\/i\/api\/graphql\//i.test(url) || /UserByScreenName/i.test(url)) {
     return wildcardUserByScreenNameUrl(url);
   }
+  const wild = wildcardXGraphqlUrl(url);
+  if (wild !== url) return wild;
   if (!handle) return url;
   const match = url.match(
     /^(https:\/\/(?:www\.)?(?:x|twitter)\.com\/)(?!i\/)([A-Za-z0-9_]+)\/?(\?.*)?$/i
@@ -46,15 +59,15 @@ function retargetDataSourceUrl(url: string, handle: string) {
   return match[1] + handle + (match[3] || "");
 }
 
-function applyWildcardRequestUrl(target: unknown, handle: string) {
+function applyWildcardRequestUrl(target: unknown, handle: string, taskType: string) {
   if (!target || typeof target !== "object") return;
   const rec = target as JsonRecord;
   if (rec.request && typeof rec.request === "object") {
     const req = rec.request as JsonRecord;
-    if (typeof req.url === "string") req.url = retargetDataSourceUrl(req.url, handle);
+    if (typeof req.url === "string") req.url = retargetDataSourceUrl(req.url, handle, taskType);
   }
-  if (typeof rec.url === "string") rec.url = retargetDataSourceUrl(rec.url, handle);
-  if (typeof rec.backUrl === "string") rec.backUrl = retargetDataSourceUrl(rec.backUrl, handle);
+  if (typeof rec.url === "string") rec.url = retargetDataSourceUrl(rec.url, handle, taskType);
+  if (typeof rec.backUrl === "string") rec.backUrl = retargetDataSourceUrl(rec.backUrl, handle, taskType);
 }
 
 export function friendlyPrimusError(err: unknown) {
@@ -85,12 +98,14 @@ export async function startPrimusProof(opts: {
   taskId: string;
   templateId?: string | null;
   handle?: string | null;
+  taskType?: string | null;
   user: PrimusUser;
   onStatus?: (msg: string) => void;
 }) {
   const { taskId, user, onStatus } = opts;
   let handle = normalizeXHandle(opts.handle);
   let templateId = (opts.templateId || "").trim();
+  let taskType = (opts.taskType || "").trim();
 
   onStatus?.("Starting proof on this page…");
 
@@ -101,10 +116,12 @@ export async function startPrimusProof(opts: {
   const proveCfg = (await proveRes.json()) as {
     error?: string;
     handle?: string;
+    type?: string;
     templateId?: string;
     boundAddress?: string;
   };
   if (!proveRes.ok) throw new Error(proveCfg.error || "Could not load this quest");
+  if (proveCfg.type) taskType = proveCfg.type;
   if (proveCfg.handle) handle = normalizeXHandle(proveCfg.handle);
   if (proveCfg.templateId) templateId = proveCfg.templateId;
   if (!templateId) templateId = primusCfg.followTemplateId || "";
@@ -140,25 +157,29 @@ export async function startPrimusProof(opts: {
   } else {
     request.allJsonResponseFlag = "true";
   }
-  applyWildcardRequestUrl(request, handle);
-  applyWildcardRequestUrl(request.request, handle);
+  applyWildcardRequestUrl(request, handle, taskType);
+  applyWildcardRequestUrl(request.request, handle, taskType);
 
   let unsigned = request.toJsonString();
   try {
     const parsed = JSON.parse(unsigned) as JsonRecord;
-    applyWildcardRequestUrl(parsed, handle);
-    applyWildcardRequestUrl(parsed.request, handle);
-    applyWildcardRequestUrl(parsed.attRequest, handle);
-    if (parsed.attRequest) applyWildcardRequestUrl((parsed.attRequest as JsonRecord).request, handle);
+    applyWildcardRequestUrl(parsed, handle, taskType);
+    applyWildcardRequestUrl(parsed.request, handle, taskType);
+    applyWildcardRequestUrl(parsed.attRequest, handle, taskType);
+    if (parsed.attRequest) {
+      applyWildcardRequestUrl((parsed.attRequest as JsonRecord).request, handle, taskType);
+    }
     unsigned = JSON.stringify(parsed);
   } catch {
     // keep unsigned as toJsonString()
   }
 
   onStatus?.(
-    handle
-      ? `Keep the orange Primus popup in front. Stay on @${handle}'s profile in the tab Primus opens.`
-      : "Keep the orange Primus popup in front until it finishes."
+    taskType === "X_POST" && handle
+      ? `Keep the orange Primus popup in front. Stay on your profile @${handle} in the tab Primus opens.`
+      : handle
+        ? `Keep the orange Primus popup in front. Stay on @${handle}'s profile in the tab Primus opens.`
+        : "Keep the orange Primus popup in front until it finishes."
   );
 
   const signedRes = await fetch("/api/primus/sign", {
