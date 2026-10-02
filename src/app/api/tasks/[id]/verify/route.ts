@@ -45,6 +45,14 @@ export async function POST(
   const task = await prisma.task.findUnique({ where: { id: params.id } });
   if (!task) return NextResponse.json({ error: "Unknown task" }, { status: 404 });
 
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: task.campaignId },
+    select: { endsAt: true },
+  });
+  if (campaign?.endsAt && campaign.endsAt.getTime() <= Date.now()) {
+    return NextResponse.json({ error: "This campaign has ended" }, { status: 400 });
+  }
+
   const existing = await prisma.taskCompletion.findUnique({
     where: { userId_taskId: { userId: user.id, taskId: task.id } },
   });

@@ -25,6 +25,8 @@ export async function GET(
     : [];
   const done = new Set(completions.map((c) => c.taskId));
 
+  const ended = Boolean(campaign.endsAt && campaign.endsAt.getTime() <= Date.now());
+
   return NextResponse.json({
     campaign: {
       id: campaign.id,
@@ -34,6 +36,7 @@ export async function GET(
       accent: campaign.accent,
       startsAt: campaign.startsAt,
       endsAt: campaign.endsAt,
+      ended,
     },
     tasks: campaign.tasks.map((task) => {
       const config = parseTaskConfig(task.config);
@@ -54,7 +57,7 @@ export async function GET(
           request: config.request,
           responseResolves: config.responseResolves,
         },
-        status: done.has(task.id) ? "verified" : "not_started",
+        status: done.has(task.id) ? "verified" : ended ? "locked" : "not_started",
         ownerCompletes:
           task.type === "X_FOLLOW" &&
           Boolean(config.handle),

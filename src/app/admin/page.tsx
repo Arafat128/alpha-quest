@@ -8,6 +8,7 @@ type Campaign = {
   slug: string;
   title: string;
   description: string;
+  endsAt?: string | null;
   tasks: {
     id: string;
     title: string;
@@ -39,6 +40,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [endsAt, setEndsAt] = useState("");
   const [taskCampaign, setTaskCampaign] = useState("");
   const [taskType, setTaskType] = useState("X_FOLLOW");
   const [taskTitle, setTaskTitle] = useState("");
@@ -152,6 +154,16 @@ export default function AdminPage() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
+          <label className="text-xs uppercase tracking-wider text-slate-500 md:col-span-2">
+            End date and time
+            <input
+              type="datetime-local"
+              className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm normal-case tracking-normal text-slate-100"
+              data-testid="campaign-ends"
+              value={endsAt}
+              onChange={(e) => setEndsAt(e.target.value)}
+            />
+          </label>
         </div>
         <button
           className="btn-primary mt-4"
@@ -159,7 +171,11 @@ export default function AdminPage() {
             const res = await fetch("/api/admin/campaigns", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ title, description }),
+              body: JSON.stringify({
+                title,
+                description,
+                endsAt: endsAt ? new Date(endsAt).toISOString() : null,
+              }),
             });
             const json = await res.json();
             setMsg(res.ok ? `Created ${json.campaign.slug}` : json.error);
@@ -168,6 +184,7 @@ export default function AdminPage() {
               setTaskCampaign(json.campaign.id);
               setTitle("");
               setDescription("");
+              setEndsAt("");
             }
           }}
           data-testid="create-campaign"
@@ -292,6 +309,20 @@ export default function AdminPage() {
             <div key={c.id} className="glass rounded-2xl p-5">
               <p className="font-semibold">{c.title}</p>
               <p className="mt-1 text-xs text-slate-500">{c.slug}</p>
+              <CampaignControls
+                campaign={c}
+                onUpdated={(nextEndsAt) => {
+                  setCampaigns((prev) =>
+                    prev.map((camp) => (camp.id === c.id ? { ...camp, endsAt: nextEndsAt } : camp))
+                  );
+                  setMsg(nextEndsAt ? `End date saved for ${c.title}.` : `End date cleared for ${c.title}.`);
+                }}
+                onDeleted={() => {
+                  setCampaigns((prev) => prev.filter((camp) => camp.id !== c.id));
+                  setTaskCampaign((current) => (current === c.id ? "" : current));
+                  setMsg(`Deleted ${c.title}.`);
+                }}
+              />
               <ul className="mt-3 space-y-3 text-sm text-slate-400">
                 {c.tasks.map((t) => (
                   <li key={t.id} className="rounded-xl border border-white/10 p-3">
@@ -368,6 +399,110 @@ export default function AdminPage() {
         </div>
       </section>
       {msg && <p className="text-sm text-sky-200">{msg}</p>}
+    </div>
+  );
+}
+
+function toDatetimeLocal(iso?: string | null) {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function CampaignControls({
+  campaign,
+  onUpdated,
+  onDeleted,
+}: {
+  campaign: Campaign;
+  onUpdated: (endsAt: string | null) => void;
+  onDeleted: () => void;
+}) {
+  const [end, setEnd] = useState(toDatetimeLocal(campaign.endsAt));
+  const [busy, setBusy] = useState<"save" | "delete" | null>(null);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    setEnd(toDatetimeLocal(campaign.endsAt));
+  }, [campaign.endsAt]);
+
+  async function save(next: string) {
+    setBusy("save");
+    setErr("");
+    try {
+      const res = await fetch(`/api/admin/campaigns/${campaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endsAt: next ? new Date(next).toISOString() : null }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Could not save end date");
+      onUpdated(json.campaign?.endsAt ?? null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not save end date");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function remove() {
+    if (!window.confirm(`Delete “${campaign.title}” and its tasks? This cannot be undone.`)) return;
+    setBusy("delete");
+    setErr("");
+    try {
+      const res = await fetch(`/api/admin/campaigns/${campaign.id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Could not delete campaign");
+      onDeleted();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not delete campaign");
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="mt-4 border-t border-white/10 pt-3">
+      <label className="text-xs uppercase tracking-wider text-slate-500" htmlFor={`end-${campaign.id}`}>
+        End date and time
+      </label>
+      <input
+        id={`end-${campaign.id}`}
+        type="datetime-local"
+        className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
+        value={end}
+        onChange={(e) => setEnd(e.target.value)}
+      />
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button className="btn-ghost text-xs" disabled={busy !== null} type="button" onClick={() => void save(end)}>
+          {busy === "save" ? "Saving…" : "Save end"}
+        </button>
+        <button
+          className="btn-ghost text-xs"
+          disabled={busy !== null || !end}
+          type="button"
+          onClick={() => {
+            setEnd("");
+            void save("");
+          }}
+        >
+          Clear end
+        </button>
+        <button
+          className="btn-ghost text-xs text-rose-300"
+          disabled={busy !== null}
+          type="button"
+          data-testid={`delete-campaign-${campaign.slug}`}
+          onClick={() => void remove()}
+        >
+          {busy === "delete" ? "Deleting…" : "Delete campaign"}
+        </button>
+      </div>
+      {campaign.endsAt && new Date(campaign.endsAt).getTime() <= Date.now() && (
+        <p className="mt-2 text-xs text-rose-300">This campaign is closed.</p>
+      )}
+      {err && <p className="mt-2 text-xs text-rose-300">{err}</p>}
     </div>
   );
 }

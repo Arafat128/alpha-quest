@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { awaitDb, prisma } from "@/lib/prisma";
 import HomeHero from "@/components/HomeHero";
+import LocalTime from "@/components/LocalTime";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export default async function HomePage() {
     slug: string;
     title: string;
     description: string;
+    endsAt: Date | null;
     _count: { tasks: number };
   }> = [];
   try {
@@ -47,6 +49,14 @@ export default async function HomePage() {
             <div>
               <h3>{c.title}</h3>
               <p>{c.description}</p>
+              {c.endsAt && (
+                <p className="end-note">
+                  <LocalTime
+                    iso={c.endsAt.toISOString()}
+                    prefix={c.endsAt.getTime() <= Date.now() ? "Ended " : "Ends "}
+                  />
+                </p>
+              )}
             </div>
             <span className="meta">{c._count.tasks} tasks</span>
             <span className="go">Enter</span>

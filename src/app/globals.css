@@ -282,6 +282,15 @@ body::before {
   color: var(--muted);
 }
 
+.campaign-row .end-note,
+.end-note {
+  margin-top: 8px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+}
+
 .meta,
 .go {
   font-family: var(--font-geist-mono), ui-monospace, monospace;
