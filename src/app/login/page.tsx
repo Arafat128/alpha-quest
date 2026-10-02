@@ -29,23 +29,19 @@ function LoginInner() {
   };
 
   return (
-    <div className="mx-auto max-w-lg">
-      <p className="text-xs uppercase tracking-[0.22em] text-sky-300">Alpha Quest</p>
-      <h1 className="display mt-3 text-5xl">{already ? "Already signed in" : "Log in"}</h1>
-      <p className="mt-4 text-slate-400">
+    <div className="auth-card">
+      <p className="kicker">Alpha Quest</p>
+      <h1 className="display page-title">{already ? "Already signed in" : "Log in"}</h1>
+      <p className="hero-copy">
         No wallet required. Sign in with X or Discord. Task proofs still use Primus zkTLS against
         your live session.
       </p>
-      {error && (
-        <p className="mt-4 rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-          {messages[error] || error}
-        </p>
-      )}
-      <div className="mt-8 flex flex-col gap-3">
-        <a className="btn-primary justify-center py-3" data-testid="login-x" href="/api/auth/x">
+      {error && <p className="note">{messages[error] || error}</p>}
+      <div className="login-actions">
+        <a className="btn-primary" data-testid="login-x" href="/api/auth/x">
           Continue with X
         </a>
-        <a className="btn-ghost justify-center py-3" data-testid="login-discord" href="/api/auth/discord">
+        <a className="btn-ghost" data-testid="login-discord" href="/api/auth/discord">
           Continue with Discord
         </a>
       </div>
@@ -57,7 +53,7 @@ export const dynamic = "force-dynamic";
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<p className="text-slate-400">Loading…</p>}>
+    <Suspense fallback={<p className="muted">Loading…</p>}>
       <LoginInner />
     </Suspense>
   );

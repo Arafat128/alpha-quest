@@ -128,11 +128,11 @@ const VerifyButton = forwardRef<VerifyHandle, Props>(function VerifyButton(
   useImperativeHandle(ref, () => ({ start: () => void start() }), [start]);
 
   if (status === "verified") {
-    return <span className="text-sm font-semibold text-emerald-300">Verified</span>;
+    return <span className="status-ok">Verified</span>;
   }
 
   if (status === "locked") {
-    return <span className="text-sm font-semibold text-slate-500">Locked</span>;
+    return <span className="status-locked">Locked</span>;
   }
 
   return (

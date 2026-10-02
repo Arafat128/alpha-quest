@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 
-export default function HomeHero() {
+export default function HomeHero({
+  campaigns,
+  tasks,
+}: {
+  campaigns: number;
+  tasks: number;
+}) {
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
   const [name, setName] = useState("");
 
@@ -17,28 +23,56 @@ export default function HomeHero() {
   }, []);
 
   return (
-    <section className="relative overflow-hidden rounded-[2rem] border border-white/10 px-8 py-16 md:px-14">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.22),transparent_42%)]" />
-      <p className="text-xs uppercase tracking-[0.28em] text-sky-300">Alpha Quest</p>
-      <h1 className="display mt-4 max-w-3xl text-5xl leading-[1.05] md:text-6xl">
-        Prove the action.
-        <em className="block text-sky-200/90"> Keep the session yours.</em>
-      </h1>
-      <p className="mt-6 max-w-xl text-base leading-7 text-slate-400">
-        {loggedIn
-          ? `Signed in as ${name}. Open a campaign and verify tasks — X actions still use Primus zkTLS.`
-          : "Log in with X or Discord — no wallet required. Follows and posts are attested with Primus zkTLS from your browser session."}
-      </p>
-      {loggedIn === false && (
-        <a href="/login" className="btn-primary mt-8 inline-flex">
-          Log in with X or Discord
-        </a>
-      )}
-      {loggedIn === true && (
-        <a href="#campaigns" className="btn-primary mt-8 inline-flex">
-          Continue to campaigns
-        </a>
-      )}
+    <section className="hero">
+      <div>
+        <p className="kicker">Primus zkTLS · no wallet</p>
+        <h1 className="display">
+          Prove the action.
+          <em> Keep the session yours.</em>
+        </h1>
+        <p className="hero-copy">
+          {loggedIn
+            ? `Signed in as ${name}. Open a campaign and verify tasks — X actions still use Primus zkTLS.`
+            : "Log in with X or Discord. Follows and posts are attested from your live browser session, not a checkbox."}
+        </p>
+        {loggedIn === false && (
+          <a href="/login" className="btn-primary mt-8">
+            Log in with X or Discord
+          </a>
+        )}
+        {loggedIn === true && (
+          <a href="#campaigns" className="btn-primary mt-8">
+            Continue to campaigns
+          </a>
+        )}
+      </div>
+      <aside className="slip" aria-label="How a proof works">
+        <div className="slip-top">
+          <span>AQ-01</span>
+          <span>Live session</span>
+        </div>
+        <p className="slip-title">Attestation</p>
+        <ol>
+          <li>
+            <span>01</span>
+            Sign in with X or Discord
+          </li>
+          <li>
+            <span>02</span>
+            Do the action in your own browser
+          </li>
+          <li>
+            <span>03</span>
+            zkTLS proves it. The session stays local
+          </li>
+        </ol>
+        <div className="slip-foot">
+          <span className="seal">
+            {String(campaigns).padStart(2, "0")} campaigns · {tasks} tasks
+          </span>
+          <span>Primus</span>
+        </div>
+      </aside>
     </section>
   );
 }

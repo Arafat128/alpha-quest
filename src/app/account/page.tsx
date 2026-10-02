@@ -39,14 +39,15 @@ export default function AccountPage() {
     if (q.get("error") === "x_taken") setInfo("That X account is already used on another player.");
   }, []);
 
-  if (!loaded) return <p className="text-slate-400">Loading…</p>;
+  if (!loaded) return <p className="muted">Loading…</p>;
 
   if (!me) {
     return (
       <div>
-        <h1 className="display text-5xl">Account</h1>
-        <p className="mt-4 text-slate-400">Log in with X or Discord to continue.</p>
-        <a href="/login" className="btn-primary mt-6 inline-flex">
+        <p className="kicker">Player</p>
+        <h1 className="display page-title">Account</h1>
+        <p className="hero-copy">Log in with X or Discord to continue.</p>
+        <a href="/login" className="btn-primary mt-6">
           Log in
         </a>
       </div>
@@ -58,33 +59,30 @@ export default function AccountPage() {
 
   return (
     <div className="max-w-xl">
-      <h1 className="display text-5xl">Account</h1>
-      <p className="mt-3 text-slate-400">
+      <p className="kicker">Player</p>
+      <h1 className="display page-title">Account</h1>
+      <p className="hero-copy">
         Signed in as {me.displayName}. Wallet is optional. X proofs still go through Primus zkTLS.
       </p>
-      <p className="mt-2 text-sm text-sky-200">{me.points} points</p>
+      <p className="points mt-3 text-sm">{me.points} points</p>
 
-      <section className="glass mt-8 rounded-3xl p-6">
-        <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Social</p>
-        <div className="mt-4 space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-slate-300">X</span>
+      <section className="panel">
+        <p className="kicker">Social</p>
+        <div className="mt-2">
+          <div className="row">
+            <span className="text-sm">X</span>
             {me.xHandle ? (
-              <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-sm text-emerald-300">
-                Connected @{me.xHandle}
-              </span>
+              <span className="chip">Connected @{me.xHandle}</span>
             ) : (
               <a className="btn-ghost text-xs" href="/api/auth/x?intent=link">
                 Link X
               </a>
             )}
           </div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-slate-300">Discord</span>
+          <div className="row">
+            <span className="text-sm">Discord</span>
             {discordConnected ? (
-              <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-sm text-emerald-300">
-                Connected {discordLabel}
-              </span>
+              <span className="chip">Connected {discordLabel}</span>
             ) : (
               <a className="btn-ghost text-xs" href="/api/auth/discord?intent=link">
                 Link Discord
@@ -94,10 +92,10 @@ export default function AccountPage() {
         </div>
       </section>
 
-      <section className="glass mt-5 rounded-3xl p-6">
-        <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Email OTP</p>
+      <section className="panel">
+        <p className="kicker">Email OTP</p>
         <input
-          className="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
+          className="field"
           placeholder="you@email.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -117,7 +115,7 @@ export default function AccountPage() {
           Send code
         </button>
         <input
-          className="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
+          className="field"
           placeholder="6-digit code"
           value={code}
           onChange={(e) => setCode(e.target.value)}
@@ -140,28 +138,24 @@ export default function AccountPage() {
         >
           Confirm email
         </button>
-        {me.emailVerified && <p className="mt-2 text-sm text-emerald-300">Verified {me.email}</p>}
+        {me.emailVerified && <p className="mt-3 text-sm text-[var(--ok)]">Verified {me.email}</p>}
       </section>
 
-      <section className="glass mt-5 rounded-3xl p-6">
-        <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Wallet (optional)</p>
-        <p className="mt-2 text-sm text-slate-400">
+      <section className="panel">
+        <p className="kicker">Wallet · optional</p>
+        <p className="mt-2 text-sm text-[var(--muted)]">
           Not required to play. Link only if a later campaign needs an address.
         </p>
         <div className="mt-4">
           {me.walletAddress ? (
-            <p className="font-mono text-xs">{me.walletAddress}</p>
+            <p className="mono text-xs">{me.walletAddress}</p>
           ) : (
             <ConnectWallet />
           )}
         </div>
       </section>
       {info && (
-        <p
-          className={`mt-4 text-sm ${
-            info.toLowerCase().includes("already") ? "text-amber-300" : "text-sky-200"
-          }`}
-        >
+        <p className={`mt-4 text-sm ${info.toLowerCase().includes("already") ? "text-[var(--gold)]" : "text-[var(--cyan)]"}`}>
           {info}
         </p>
       )}

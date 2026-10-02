@@ -22,34 +22,34 @@ export default async function HomePage() {
     campaigns = [];
   }
 
+  const taskTotal = campaigns.reduce((sum, c) => sum + c._count.tasks, 0);
+
   return (
     <div>
-      <HomeHero />
+      <HomeHero campaigns={campaigns.length} tasks={taskTotal} />
 
-      <h2 id="campaigns" className="mt-12 text-sm uppercase tracking-[0.2em] text-slate-400">
-        Campaigns
-      </h2>
-      <div className="mt-5 grid gap-5 md:grid-cols-2">
-        {campaigns.length === 0 && (
-          <div className="glass rounded-3xl p-8 text-slate-400">
-            No campaigns yet. Check back soon.
-          </div>
-        )}
-        {campaigns.map((c) => (
+      <div className="section-head" id="campaigns">
+        <h2>Campaigns</h2>
+        <span className="kicker" style={{ color: "var(--faint)" }}>
+          {String(campaigns.length).padStart(2, "0")} open
+        </span>
+      </div>
+      <div className="ledger">
+        {campaigns.length === 0 && <div className="empty">No campaigns yet. Check back soon.</div>}
+        {campaigns.map((c, i) => (
           <Link
             key={c.id}
             href={`/campaigns/${c.slug}`}
             data-testid={`campaign-${c.slug}`}
-            className="glass hairline group rounded-3xl p-7 transition hover:-translate-y-0.5"
+            className="campaign-row"
           >
-            <p className="text-xs uppercase tracking-[0.18em] text-sky-300/80">
-              {c._count.tasks} tasks
-            </p>
-            <h3 className="display mt-3 text-3xl">{c.title}</h3>
-            <p className="mt-3 text-sm leading-6 text-slate-400">{c.description}</p>
-            <span className="mt-6 inline-block text-sm text-sky-200 group-hover:underline">
-              Enter campaign →
-            </span>
+            <span className="idx">{String(i + 1).padStart(2, "0")}</span>
+            <div>
+              <h3>{c.title}</h3>
+              <p>{c.description}</p>
+            </div>
+            <span className="meta">{c._count.tasks} tasks</span>
+            <span className="go">Enter</span>
           </Link>
         ))}
       </div>

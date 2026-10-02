@@ -44,37 +44,37 @@ export default function TaskCard({
     <article
       data-testid="task-card"
       onClick={clickable ? startVerify : undefined}
-      className={`glass hairline rounded-3xl p-6 ${verified ? "glow-verified" : ""} ${
-        locked ? "opacity-40" : ""
-      } ${clickable ? "cursor-pointer" : ""}`}
+      className={`task ${verified ? "is-verified" : ""} ${locked ? "is-locked" : ""} ${
+        clickable ? "is-clickable" : ""
+      }`}
     >
-      <div className="flex items-start justify-between gap-6">
-        <div>
-          <p className="text-xs uppercase tracking-[0.18em] text-sky-300/80">{task.type}</p>
-          <h3 className="mt-2 text-lg font-semibold">{task.title}</h3>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">{task.description}</p>
-          {(task.type === "DISCORD_JOIN" || task.type === "DISCORD_ROLE") && (
-            <p className="mt-2 text-sm text-slate-400">
-              Join the server first. We check Discord membership with the bot
-              {task.config.inviteUrl ? (
-                <>
-                  {" — "}
-                  <a
-                    className="text-sky-300 hover:underline"
-                    href={task.config.inviteUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    open Discord
-                  </a>
-                </>
-              ) : null}
-              .
-            </p>
-          )}
-          <p className="mt-3 text-sm text-slate-300">{task.points} pts</p>
-        </div>
+      <div>
+        <p className="kicker">{task.type.replaceAll("_", " ")}</p>
+        <h3>{task.title}</h3>
+        <p className="desc">{task.description}</p>
+        {(task.type === "DISCORD_JOIN" || task.type === "DISCORD_ROLE") && (
+          <p className="desc">
+            Join the server first. We check Discord membership with the bot
+            {task.config.inviteUrl ? (
+              <>
+                {" — "}
+                <a
+                  className="text-[var(--cyan)] hover:underline"
+                  href={task.config.inviteUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  open Discord
+                </a>
+              </>
+            ) : null}
+            .
+          </p>
+        )}
+      </div>
+      <div className="task-side">
+        <p className="pts">{task.points} pts</p>
         <VerifyButton ref={verifyRef} taskId={task.id} {...task} onDone={onDone} />
       </div>
     </article>
