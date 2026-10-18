@@ -135,7 +135,7 @@ function wildcardSignParams(
     discordTask && ctx.guildId
       ? discordChannelUrl(ctx.guildId)
       : ctx.taskType === "X_POST"
-        ? `https://x.com/${handle || "home"}`
+        ? "https://x.com/home"
         : handle
           ? `https://x.com/${handle}`
           : "";

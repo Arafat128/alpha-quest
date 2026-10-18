@@ -164,7 +164,7 @@ export async function startPrimusProof(opts: {
   // URL, overriding Hub dataPageTemplate.baseUrl.
   const extra: JsonRecord = { taskId, userId: user.id, handle, guildId };
   if (discordTask && guildId) extra.launch_page = discordChannelUrl(guildId);
-  else if (taskType === "X_POST") extra.launch_page = handle ? `https://x.com/${handle}` : "https://x.com/home";
+  else if (taskType === "X_POST") extra.launch_page = "https://x.com/home";
   else if (handle) extra.launch_page = `https://x.com/${handle}`;
   request.setAdditionParams(JSON.stringify(extra));
   if (typeof request.setAllJsonResponseFlag === "function") {
@@ -194,9 +194,7 @@ export async function startPrimusProof(opts: {
     discordTask
       ? "Keep the orange Primus popup in front. Stay in the campaign Discord server in the tab Primus opens."
       : taskType === "X_POST"
-        ? handle
-          ? `Keep the orange Primus popup in front. Stay on your profile @${handle} in the tab Primus opens.`
-          : "Keep the orange Primus popup in front. In the X tab, open your own profile and stay there. You must already be logged into X in this Chrome profile."
+        ? "Keep the orange Primus popup in front. In the X tab, click your profile picture and stay on your posts. You must already be logged into X in this Chrome profile."
         : handle
           ? `Keep the orange Primus popup in front. Stay on @${handle}'s profile in the tab Primus opens.`
           : "Keep the orange Primus popup in front until it finishes."
