@@ -112,15 +112,19 @@ function wildcardSignParams(
   ctx: { taskType: string; questHandle: string; userHandle: string; guildId: string }
 ) {
   let extraHandle = "";
+  let clientLaunch = "";
   try {
     const raw = parsed.additionParams;
     const extra =
       typeof raw === "string"
-        ? (JSON.parse(raw) as { handle?: string })
+        ? (JSON.parse(raw) as { handle?: string; launch_page?: string })
         : raw && typeof raw === "object"
-          ? (raw as { handle?: string })
+          ? (raw as { handle?: string; launch_page?: string })
           : null;
     extraHandle = normalizeXHandle(extra?.handle);
+    if (extra?.launch_page && /^https:\/\/(?:www\.)?x\.com\//i.test(extra.launch_page)) {
+      clientLaunch = extra.launch_page;
+    }
   } catch {
     extraHandle = "";
   }
@@ -134,8 +138,10 @@ function wildcardSignParams(
   const launchPage =
     discordTask && ctx.guildId
       ? discordChannelUrl(ctx.guildId)
-      : ctx.taskType === "X_POST"
-        ? "https://x.com/home"
+      : ctx.taskType === "X_POST" && clientLaunch
+        ? clientLaunch
+        : ctx.taskType === "X_POST"
+          ? "https://x.com/home"
         : handle
           ? `https://x.com/${handle}`
           : "";

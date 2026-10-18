@@ -73,9 +73,11 @@ export const STALE_X_FOLLOW_TEMPLATE_IDS = new Set([
 export const USER_BY_SCREEN_NAME_REQUEST_PATTERN =
   "https://x.com/i/api/graphql/.*/UserByScreenName\\?.*";
 
-// Profile posts. X uses either name; a frozen query id is Primus 00013.
+// Profile Posts tab. Keep this a simple Hub-style matcher. Grouping breaks Primus.
 export const USER_TWEETS_REQUEST_PATTERN =
-  "https://x.com/i/api/graphql/.*/User(?:OriginalsTimeline|Tweets)\\?.*";
+  "https://x.com/i/api/graphql/.*/UserOriginalsTimeline\\?.*";
+
+export const X_ACCOUNT_SETTINGS_PATTERN = "https://api.x.com/1.1/account/settings.json.*";
 
 export const X_POST_FULL_TEXT_PATH =
   "$.data.user.result.timeline.timeline.instructions[*].entries[*].content.itemContent.tweet_results.result.legacy.full_text";

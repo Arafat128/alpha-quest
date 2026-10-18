@@ -4,6 +4,7 @@ import {
   normalizeXHandle,
   loosenXPostPaths,
   USER_TWEETS_REQUEST_PATTERN,
+  X_ACCOUNT_SETTINGS_PATTERN,
   wildcardUserByScreenNameUrl,
   wildcardXGraphqlUrl,
 } from "./task-config";
@@ -78,6 +79,41 @@ function applyWildcardRequestUrl(target: unknown, handle: string, taskType: stri
   if (typeof rec.backUrl === "string") rec.backUrl = retargetDataSourceUrl(rec.backUrl, handle, taskType, guildId);
 }
 
+function pointAtLoggedInXAccount(parsed: JsonRecord) {
+  const visit = (node: unknown) => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    const rec = node as JsonRecord;
+    if (typeof rec.url === "string" && /graphql|UserOriginalsTimeline|UserTweets|UserByScreenName/i.test(rec.url)) {
+      rec.url = X_ACCOUNT_SETTINGS_PATTERN;
+    }
+    if (rec.responseResolves) {
+      rec.responseResolves = [{ keyName: "screen_name", parsePath: "$.screen_name" }];
+    }
+    if (rec.request) visit(rec.request);
+    if (rec.attRequest) visit(rec.attRequest);
+  };
+  visit(parsed);
+}
+
+function readLoggedInXHandle(attestation: unknown) {
+  const record = attestation && typeof attestation === "object" ? (attestation as JsonRecord) : {};
+  const raw = record.data;
+  try {
+    const parsed = typeof raw === "string" ? (JSON.parse(raw) as JsonRecord) : raw;
+    if (parsed && typeof parsed === "object" && "screen_name" in parsed) {
+      return normalizeXHandle(String((parsed as JsonRecord).screen_name || ""));
+    }
+  } catch {
+    // fall through to a text search
+  }
+  const match = JSON.stringify(attestation).match(/"screen_name"\s*:\s*"([A-Za-z0-9_]{1,15})"/);
+  return match ? match[1] : "";
+}
+
 export function friendlyPrimusError(err: unknown) {
   const msg = err instanceof Error ? err.message : typeof err === "string" ? err : "";
   const code = err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code || "") : "";
@@ -108,9 +144,11 @@ export async function startPrimusProof(opts: {
   handle?: string | null;
   taskType?: string | null;
   guildId?: string | null;
+  launchPage?: string | null;
+  mode?: "account" | "proof";
   user: PrimusUser;
   onStatus?: (msg: string) => void;
-}) {
+}): Promise<void | string> {
   const { taskId, user, onStatus } = opts;
   let handle = normalizeXHandle(opts.handle);
   let templateId = (opts.templateId || "").trim();
@@ -141,6 +179,26 @@ export async function startPrimusProof(opts: {
   if (!templateId) throw new Error("This quest has no Primus Hub template.");
   if (!primusCfg.appId) throw new Error("Primus app is not configured");
 
+  if (taskType === "X_POST" && !opts.launchPage) {
+    onStatus?.("Checking the X account logged in to this Chrome profile…");
+    const screen = await startPrimusProof({
+      ...opts,
+      launchPage: "https://x.com/home",
+      mode: "account",
+    });
+    if (typeof screen !== "string" || !screen) {
+      throw new Error("Log into X in this Chrome profile, then try again.");
+    }
+    onStatus?.(`Opening @${screen}. Stay on that profile until Primus finishes.`);
+    await startPrimusProof({
+      ...opts,
+      handle: screen,
+      launchPage: `https://x.com/${screen}`,
+      mode: "proof",
+    });
+    return;
+  }
+
   const Ctor = window.PrimusZKTLS || window.VoiceSenseZKTLS;
   if (typeof Ctor !== "function") {
     throw new Error("Install and enable the Primus Chrome extension, then try again.");
@@ -163,7 +221,8 @@ export async function startPrimusProof(opts: {
   // Primus extension uses additionParams.launch_page as chrome.tabs.create
   // URL, overriding Hub dataPageTemplate.baseUrl.
   const extra: JsonRecord = { taskId, userId: user.id, handle, guildId };
-  if (discordTask && guildId) extra.launch_page = discordChannelUrl(guildId);
+  if (opts.launchPage) extra.launch_page = opts.launchPage;
+  else if (discordTask && guildId) extra.launch_page = discordChannelUrl(guildId);
   else if (taskType === "X_POST") extra.launch_page = "https://x.com/home";
   else if (handle) extra.launch_page = `https://x.com/${handle}`;
   request.setAdditionParams(JSON.stringify(extra));
@@ -185,6 +244,7 @@ export async function startPrimusProof(opts: {
       applyWildcardRequestUrl((parsed.attRequest as JsonRecord).request, handle, taskType, guildId);
     }
     if (taskType === "X_POST") loosenXPostPaths(parsed);
+    if (opts.mode === "account") pointAtLoggedInXAccount(parsed);
     unsigned = JSON.stringify(parsed);
   } catch {
     // keep unsigned as toJsonString()
@@ -193,8 +253,10 @@ export async function startPrimusProof(opts: {
   onStatus?.(
     discordTask
       ? "Keep the orange Primus popup in front. Stay in the campaign Discord server in the tab Primus opens."
-      : taskType === "X_POST"
-        ? "Keep the orange Primus popup in front. In the X tab, click your profile picture and stay on your posts. You must already be logged into X in this Chrome profile."
+      : taskType === "X_POST" && opts.mode === "account"
+        ? "Keep the orange popup in front. Stay on X until your account name is read."
+        : taskType === "X_POST"
+          ? "Keep the orange popup in front. Stay on your profile until Primus finishes."
         : handle
           ? `Keep the orange Primus popup in front. Stay on @${handle}'s profile in the tab Primus opens.`
           : "Keep the orange Primus popup in front until it finishes."
@@ -235,6 +297,15 @@ export async function startPrimusProof(opts: {
     }
   } catch {
     // extras are optional
+  }
+
+  if (opts.mode === "account") {
+    try {
+      if (typeof zk.closeDataSourceTab === "function") zk.closeDataSourceTab();
+    } catch {
+      // ignore
+    }
+    return readLoggedInXHandle(attestation);
   }
 
   const verifyRes = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/verify`, {
