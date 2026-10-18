@@ -11,7 +11,6 @@ import {
   DISCORD_MEMBER_REQUEST_PATTERN,
   USER_TWEETS_REQUEST_PATTERN,
   discordChannelUrl,
-  loosenXPostPaths,
   wildcardUserByScreenNameUrl,
   wildcardXGraphqlUrl,
 } from "@/lib/task-config";
@@ -176,5 +175,4 @@ function wildcardSignParams(
     if (rec.attRequest && typeof rec.attRequest === "object") apply(rec.attRequest);
   };
   apply(parsed);
-  if (ctx.taskType === "X_POST") loosenXPostPaths(parsed);
 }
