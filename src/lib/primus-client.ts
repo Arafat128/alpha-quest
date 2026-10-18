@@ -2,6 +2,7 @@ import {
   DISCORD_MEMBER_REQUEST_PATTERN,
   discordChannelUrl,
   normalizeXHandle,
+  loosenXPostPaths,
   USER_TWEETS_REQUEST_PATTERN,
   wildcardUserByScreenNameUrl,
   wildcardXGraphqlUrl,
@@ -82,7 +83,7 @@ export function friendlyPrimusError(err: unknown) {
   const code = err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code || "") : "";
   const blob = `${code} ${msg}`.toLowerCase();
   if (blob.includes("00013") || blob.includes("no verifiable data")) {
-    return "Primus could not read X. Stay logged into X in this same Chrome profile, follow the account if you have not, keep the orange popup in front, then try again.";
+    return "Primus could not read that X page. Stay logged into X in this Chrome profile, keep the orange popup in front, and stay on your own profile until it finishes.";
   }
   if (blob.includes("00006") || blob.includes("extension not detected")) {
     return "Install and enable the Primus Chrome extension, then try again.";
@@ -183,6 +184,7 @@ export async function startPrimusProof(opts: {
     if (parsed.attRequest) {
       applyWildcardRequestUrl((parsed.attRequest as JsonRecord).request, handle, taskType, guildId);
     }
+    if (taskType === "X_POST") loosenXPostPaths(parsed);
     unsigned = JSON.stringify(parsed);
   } catch {
     // keep unsigned as toJsonString()

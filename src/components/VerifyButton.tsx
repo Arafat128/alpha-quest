@@ -43,6 +43,8 @@ const VerifyButton = forwardRef<VerifyHandle, Props>(function VerifyButton(
 ) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [profile, setProfile] = useState("");
+  const [askProfile, setAskProfile] = useState(false);
   const running = useRef(false);
 
   const start = useCallback(async () => {
@@ -92,10 +94,27 @@ const VerifyButton = forwardRef<VerifyHandle, Props>(function VerifyButton(
         return;
       }
 
+      let postHandle = type === "X_POST" ? me.user.xHandle || "" : config.handle || "";
+      if (type === "X_POST") {
+        const typed = profile.replace(/^@/, "").trim();
+        if (!postHandle && !/^[A-Za-z0-9_]{1,15}$/.test(typed)) {
+          setAskProfile(true);
+          throw new Error("Enter your X username, then click Verify. Primus opens that profile. This is not an X login.");
+        }
+        if (/^[A-Za-z0-9_]{1,15}$/.test(typed)) {
+          postHandle = typed;
+          await fetch("/api/account/x-handle", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ handle: typed }),
+          });
+        }
+      }
+
       await startPrimusProof({
         taskId,
         templateId: primusTemplateId,
-        handle: type === "X_POST" ? me.user.xHandle || "" : config.handle,
+        handle: postHandle,
         taskType: type,
         user: { id: me.user.id, boundAddress: me.user.boundAddress },
         onStatus: setMsg,
@@ -108,7 +127,7 @@ const VerifyButton = forwardRef<VerifyHandle, Props>(function VerifyButton(
       running.current = false;
       setBusy(false);
     }
-  }, [config.handle, onDone, primusTemplateId, status, taskId, type]);
+  }, [config.guildId, config.handle, onDone, primusTemplateId, profile, status, taskId, type]);
 
   useImperativeHandle(ref, () => ({ start: () => void start() }), [start]);
 
@@ -122,6 +141,15 @@ const VerifyButton = forwardRef<VerifyHandle, Props>(function VerifyButton(
 
   return (
     <div className="flex flex-col items-end gap-2">
+      {type === "X_POST" && askProfile ? (
+        <input
+          className="field w-36"
+          placeholder="@username"
+          value={profile}
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) => setProfile(event.target.value)}
+        />
+      ) : null}
       <button
         className="btn-primary"
         data-testid="verify-btn"

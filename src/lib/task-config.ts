@@ -73,9 +73,35 @@ export const STALE_X_FOLLOW_TEMPLATE_IDS = new Set([
 export const USER_BY_SCREEN_NAME_REQUEST_PATTERN =
   "https://x.com/i/api/graphql/.*/UserByScreenName\\?.*";
 
-// Profile Posts tab. X now calls UserOriginalsTimeline, not UserTweets.
+// Profile posts. X uses either name; a frozen query id is Primus 00013.
 export const USER_TWEETS_REQUEST_PATTERN =
-  "https://x.com/i/api/graphql/.*/UserOriginalsTimeline\\?.*";
+  "https://x.com/i/api/graphql/.*/User(?:OriginalsTimeline|Tweets)\\?.*";
+
+export const X_POST_FULL_TEXT_PATH =
+  "$.data.user.result.timeline.timeline.instructions[*].entries[*].content.itemContent.tweet_results.result.legacy.full_text";
+
+export function loosenXPostPaths(node: unknown) {
+  if (!node || typeof node !== "object") return;
+  if (Array.isArray(node)) {
+    node.forEach(loosenXPostPaths);
+    return;
+  }
+  const rec = node as Record<string, unknown>;
+  if (typeof rec.responseResolves === "string") {
+    try {
+      const parsed = JSON.parse(rec.responseResolves) as unknown;
+      loosenXPostPaths(parsed);
+      rec.responseResolves = JSON.stringify(parsed);
+    } catch {
+      // keep the original string
+    }
+  }
+  const key = String(rec.keyName || "");
+  if (typeof rec.parsePath === "string" && /full_text/i.test(key + rec.parsePath)) {
+    rec.parsePath = X_POST_FULL_TEXT_PATH;
+  }
+  for (const value of Object.values(rec)) loosenXPostPaths(value);
+}
 
 // Logged-in Discord user's server list or one server's member record.
 export const DISCORD_MEMBER_REQUEST_PATTERN =
