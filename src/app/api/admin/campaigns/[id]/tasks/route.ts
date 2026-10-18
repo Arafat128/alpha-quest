@@ -6,7 +6,7 @@ import { discordGuildId } from "@/lib/discord";
 
 export const dynamic = "force-dynamic";
 
-const TYPES = ["X_FOLLOW", "X_POST", "DISCORD_JOIN", "DISCORD_ROLE", "EMAIL_VERIFY"];
+const TYPES = ["X_FOLLOW", "X_POST", "DISCORD_JOIN", "DISCORD_ROLE"];
 
 export async function POST(
   req: Request,
@@ -43,9 +43,7 @@ export async function POST(
         ? "Post on X"
         : type === "DISCORD_JOIN"
           ? "Join Discord"
-          : type === "DISCORD_ROLE"
-            ? "Get Discord role"
-            : "Verify email");
+          : "Get Discord role");
 
   let config: Record<string, unknown> = {};
   if (type === "X_FOLLOW") {

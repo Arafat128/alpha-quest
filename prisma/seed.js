@@ -27,7 +27,7 @@ const xPostConfig = {
   mention: "primus_labs",
   requiredField: "full_text",
   request: {
-    url: "https://x.com/i/api/graphql/.*/UserTweets\\?.*",
+    url: "https://x.com/i/api/graphql/.*/UserOriginalsTimeline\\?.*",
     method: "GET",
     header: {},
     body: "",
@@ -87,14 +87,6 @@ async function main() {
             }),
             points: 80,
             sortOrder: 3,
-          },
-          {
-            type: "EMAIL_VERIFY",
-            title: "Verify your email",
-            description: "Confirm your email with a one-time code.",
-            config: JSON.stringify({}),
-            points: 40,
-            sortOrder: 4,
           },
         ],
       },

@@ -26,10 +26,6 @@ async function main() {
       description: "Join the campaign Discord. Membership is checked against the official server.",
     },
   });
-  await p.task.updateMany({
-    where: { type: "EMAIL_VERIFY" },
-    data: { description: "Confirm your email with a one-time code." },
-  });
   console.log("copy updated");
 }
 

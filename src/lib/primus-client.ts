@@ -1,4 +1,6 @@
 import {
+  DISCORD_MEMBER_REQUEST_PATTERN,
+  discordChannelUrl,
   normalizeXHandle,
   USER_TWEETS_REQUEST_PATTERN,
   wildcardUserByScreenNameUrl,
@@ -39,9 +41,14 @@ declare global {
   }
 }
 
-function retargetDataSourceUrl(url: string, handle: string, taskType: string) {
+function retargetDataSourceUrl(url: string, handle: string, taskType: string, guildId = "") {
+  if (taskType === "DISCORD_JOIN" || taskType === "DISCORD_ROLE") {
+    if (/discord\.com\/api\/.*\/users\/@me\/guilds/i.test(url)) return DISCORD_MEMBER_REQUEST_PATTERN;
+    if (guildId && /^https:\/\/discord\.com\/channels\/\d+/i.test(url)) return discordChannelUrl(guildId);
+    return url;
+  }
   if (taskType === "X_POST" && /\/i\/api\/graphql\//i.test(url)) {
-    if (/UserByScreenName/i.test(url) || /UserTweets/i.test(url)) {
+    if (/UserByScreenName/i.test(url) || /UserTweets/i.test(url) || /UserOriginalsTimeline/i.test(url)) {
       return USER_TWEETS_REQUEST_PATTERN;
     }
     return wildcardXGraphqlUrl(url);
@@ -59,15 +66,15 @@ function retargetDataSourceUrl(url: string, handle: string, taskType: string) {
   return match[1] + handle + (match[3] || "");
 }
 
-function applyWildcardRequestUrl(target: unknown, handle: string, taskType: string) {
+function applyWildcardRequestUrl(target: unknown, handle: string, taskType: string, guildId = "") {
   if (!target || typeof target !== "object") return;
   const rec = target as JsonRecord;
   if (rec.request && typeof rec.request === "object") {
     const req = rec.request as JsonRecord;
-    if (typeof req.url === "string") req.url = retargetDataSourceUrl(req.url, handle, taskType);
+    if (typeof req.url === "string") req.url = retargetDataSourceUrl(req.url, handle, taskType, guildId);
   }
-  if (typeof rec.url === "string") rec.url = retargetDataSourceUrl(rec.url, handle, taskType);
-  if (typeof rec.backUrl === "string") rec.backUrl = retargetDataSourceUrl(rec.backUrl, handle, taskType);
+  if (typeof rec.url === "string") rec.url = retargetDataSourceUrl(rec.url, handle, taskType, guildId);
+  if (typeof rec.backUrl === "string") rec.backUrl = retargetDataSourceUrl(rec.backUrl, handle, taskType, guildId);
 }
 
 export function friendlyPrimusError(err: unknown) {
@@ -99,6 +106,7 @@ export async function startPrimusProof(opts: {
   templateId?: string | null;
   handle?: string | null;
   taskType?: string | null;
+  guildId?: string | null;
   user: PrimusUser;
   onStatus?: (msg: string) => void;
 }) {
@@ -106,6 +114,7 @@ export async function startPrimusProof(opts: {
   let handle = normalizeXHandle(opts.handle);
   let templateId = (opts.templateId || "").trim();
   let taskType = (opts.taskType || "").trim();
+  let guildId = (opts.guildId || "").trim();
 
   onStatus?.("Starting proof on this page…");
 
@@ -117,14 +126,17 @@ export async function startPrimusProof(opts: {
     error?: string;
     handle?: string;
     type?: string;
+    guildId?: string;
     templateId?: string;
     boundAddress?: string;
   };
   if (!proveRes.ok) throw new Error(proveCfg.error || "Could not load this quest");
   if (proveCfg.type) taskType = proveCfg.type;
   if (proveCfg.handle) handle = normalizeXHandle(proveCfg.handle);
+  if (proveCfg.guildId) guildId = proveCfg.guildId;
   if (proveCfg.templateId) templateId = proveCfg.templateId;
-  if (!templateId) templateId = primusCfg.followTemplateId || "";
+  const discordTask = taskType === "DISCORD_JOIN" || taskType === "DISCORD_ROLE";
+  if (!templateId && !discordTask) templateId = primusCfg.followTemplateId || "";
   if (!templateId) throw new Error("This quest has no Primus Hub template.");
   if (!primusCfg.appId) throw new Error("Primus app is not configured");
 
@@ -149,25 +161,26 @@ export async function startPrimusProof(opts: {
 
   // Primus extension uses additionParams.launch_page as chrome.tabs.create
   // URL, overriding Hub dataPageTemplate.baseUrl.
-  const extra: JsonRecord = { taskId, userId: user.id, handle };
-  if (handle) extra.launch_page = `https://x.com/${handle}`;
+  const extra: JsonRecord = { taskId, userId: user.id, handle, guildId };
+  if (discordTask && guildId) extra.launch_page = discordChannelUrl(guildId);
+  else if (handle) extra.launch_page = `https://x.com/${handle}`;
   request.setAdditionParams(JSON.stringify(extra));
   if (typeof request.setAllJsonResponseFlag === "function") {
     request.setAllJsonResponseFlag("true");
   } else {
     request.allJsonResponseFlag = "true";
   }
-  applyWildcardRequestUrl(request, handle, taskType);
-  applyWildcardRequestUrl(request.request, handle, taskType);
+  applyWildcardRequestUrl(request, handle, taskType, guildId);
+  applyWildcardRequestUrl(request.request, handle, taskType, guildId);
 
   let unsigned = request.toJsonString();
   try {
     const parsed = JSON.parse(unsigned) as JsonRecord;
-    applyWildcardRequestUrl(parsed, handle, taskType);
-    applyWildcardRequestUrl(parsed.request, handle, taskType);
-    applyWildcardRequestUrl(parsed.attRequest, handle, taskType);
+    applyWildcardRequestUrl(parsed, handle, taskType, guildId);
+    applyWildcardRequestUrl(parsed.request, handle, taskType, guildId);
+    applyWildcardRequestUrl(parsed.attRequest, handle, taskType, guildId);
     if (parsed.attRequest) {
-      applyWildcardRequestUrl((parsed.attRequest as JsonRecord).request, handle, taskType);
+      applyWildcardRequestUrl((parsed.attRequest as JsonRecord).request, handle, taskType, guildId);
     }
     unsigned = JSON.stringify(parsed);
   } catch {
@@ -175,11 +188,13 @@ export async function startPrimusProof(opts: {
   }
 
   onStatus?.(
-    taskType === "X_POST" && handle
-      ? `Keep the orange Primus popup in front. Stay on your profile @${handle} in the tab Primus opens.`
-      : handle
-        ? `Keep the orange Primus popup in front. Stay on @${handle}'s profile in the tab Primus opens.`
-        : "Keep the orange Primus popup in front until it finishes."
+    discordTask
+      ? "Keep the orange Primus popup in front. Stay in the campaign Discord server in the tab Primus opens."
+      : taskType === "X_POST" && handle
+        ? `Keep the orange Primus popup in front. Stay on your profile @${handle} in the tab Primus opens.`
+        : handle
+          ? `Keep the orange Primus popup in front. Stay on @${handle}'s profile in the tab Primus opens.`
+          : "Keep the orange Primus popup in front until it finishes."
   );
 
   const signedRes = await fetch("/api/primus/sign", {

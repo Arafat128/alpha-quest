@@ -49,7 +49,7 @@
     const USER_BY_SCREEN_NAME_REQUEST_PATTERN =
       "https://x.com/i/api/graphql/.*/UserByScreenName\\?.*";
     const USER_TWEETS_REQUEST_PATTERN =
-      "https://x.com/i/api/graphql/.*/UserTweets\\?.*";
+      "https://x.com/i/api/graphql/.*/UserOriginalsTimeline\\?.*";
 
     function wildcardUserByScreenNameUrl(url) {
       if (!url || typeof url !== "string") return url;
@@ -62,7 +62,7 @@
     function retargetDataSourceUrl(url) {
       if (!url || typeof url !== "string") return url;
       if (taskType === "X_POST" && /\/i\/api\/graphql\//i.test(url)) {
-        if (/UserByScreenName/i.test(url) || /UserTweets/i.test(url)) {
+        if (/UserByScreenName/i.test(url) || /UserTweets/i.test(url) || /UserOriginalsTimeline/i.test(url)) {
           return USER_TWEETS_REQUEST_PATTERN;
         }
       }

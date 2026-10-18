@@ -1,6 +1,40 @@
+import { ethers } from "ethers";
 import { PrimusPageCoreTLS } from "@primuslabs/zktls-page-core-sdk";
+import { encodeAttestation } from "@primuslabs/zktls-page-core-sdk/dist/utils";
 import { xHandleFromRequestUrl } from "./task-config";
 export { defaultTemplateForTask } from "./task-config";
+
+// page-core-sdk 0.2.1 only trusts the first address. Current Primus production
+// proofs are signed by the second. Development proofs use the third.
+const PRIMUS_ATTESTORS = new Set([
+  "0xdb736b13e2f522dbe18b2015d0291e4b193d8ef6",
+  "0x5ed3176045f68617b0958a61ac1868875c98c14d",
+  "0xe02bd7a6c8aa401189aebb5bad755c2610940a73",
+]);
+
+export function primusSignatureOk(attestation: {
+  signatures?: unknown;
+  request?: unknown;
+  reponseResolve?: unknown;
+  recipient?: unknown;
+  data?: unknown;
+  attConditions?: unknown;
+  timestamp?: unknown;
+  additionParams?: unknown;
+}): boolean {
+  const signatures = Array.isArray(attestation.signatures) ? attestation.signatures : [];
+  const hash = encodeAttestation(attestation);
+  for (const signature of signatures) {
+    if (typeof signature !== "string" || !signature) continue;
+    try {
+      const recovered = ethers.utils.recoverAddress(hash, signature).toLowerCase();
+      if (PRIMUS_ATTESTORS.has(recovered)) return true;
+    } catch {
+      // try the next signature
+    }
+  }
+  return false;
+}
 
 let signer: PrimusPageCoreTLS | null = null;
 

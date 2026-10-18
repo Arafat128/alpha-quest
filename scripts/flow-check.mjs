@@ -296,15 +296,6 @@ async function runHost(base) {
     record(host, "GET /api/admin/campaigns after logout", true, "401");
   });
 
-  await check(host, "POST /api/account/email/request-otp unauth", async () => {
-    const r = await req("/api/account/email/request-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "flow@example.com" }),
-    });
-    if (r.status !== 401) throw new Error(`expected 401 got ${r.status}`);
-    record(host, "POST email otp unauth", true, "401");
-  });
 }
 
 await check("unit", "wildcard UserByScreenName request URL", async () => {

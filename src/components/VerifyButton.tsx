@@ -79,25 +79,15 @@ const VerifyButton = forwardRef<VerifyHandle, Props>(function VerifyButton(
           window.location.href = "/api/auth/discord?intent=link";
           throw new Error("Connect Discord first, then click the task again.");
         }
-        const res = await fetch(`/api/tasks/${taskId}/verify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
+        await startPrimusProof({
+          taskId,
+          templateId: primusTemplateId,
+          taskType: type,
+          guildId: config.guildId,
+          user: { id: me.user.id, boundAddress: me.user.boundAddress },
+          onStatus: setMsg,
         });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || "Verify failed");
-        onDone?.();
-        return;
-      }
-
-      if (type === "EMAIL_VERIFY") {
-        const res = await fetch(`/api/tasks/${taskId}/verify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || "Verify failed");
+        setMsg("");
         onDone?.();
         return;
       }
@@ -148,7 +138,7 @@ const VerifyButton = forwardRef<VerifyHandle, Props>(function VerifyButton(
       >
         {busy ? "Proving…" : "Verify"}
       </button>
-      {msg ? <p className="max-w-xs text-right text-xs text-slate-400">{msg}</p> : null}
+      {msg ? <p className="max-w-xs text-right text-xs leading-5 text-slate-400">{msg}</p> : null}
     </div>
   );
 });

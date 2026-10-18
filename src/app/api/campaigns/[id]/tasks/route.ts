@@ -54,13 +54,8 @@ export async function GET(
           inviteUrl: config.inviteUrl || discordInviteUrl() || undefined,
           roleId: config.roleId,
           requiredField: config.requiredField,
-          request: config.request,
-          responseResolves: config.responseResolves,
         },
         status: done.has(task.id) ? "verified" : ended ? "locked" : "not_started",
-        ownerCompletes:
-          task.type === "X_FOLLOW" &&
-          Boolean(config.handle),
       };
     }),
   });

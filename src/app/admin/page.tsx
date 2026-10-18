@@ -216,7 +216,6 @@ export default function AdminPage() {
             <option value="X_POST">X post (zkTLS)</option>
             <option value="DISCORD_JOIN">Discord join</option>
             <option value="DISCORD_ROLE">Discord role</option>
-            <option value="EMAIL_VERIFY">Email verify</option>
           </select>
           <input
             className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"

@@ -23,35 +23,32 @@ export async function logAudit(opts: {
   });
 }
 
-export async function recomputeRisk(userId: string): Promise<{ score: number; flags: RiskFlag[] }> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      completions: { include: { task: true } },
-      auditEvents: { orderBy: { createdAt: "desc" }, take: 50 },
-    },
-  });
-  if (!user) return { score: 0, flags: [] };
+type RiskInput = {
+  createdAt: Date;
+  lastIp: string | null;
+  xUserId: string | null;
+  discordId: string | null;
+  completions: { pointsAwarded: number; verifiedAt: Date }[];
+  auditEvents: { type: string }[];
+  sameIpOthers: number;
+  socialClash: boolean;
+};
 
+export function assessRisk(input: RiskInput): { score: number; flags: RiskFlag[] } {
   const flags: RiskFlag[] = [];
   const now = Date.now();
-  const ageHours = (now - user.createdAt.getTime()) / 36e5;
-  const points = user.completions.reduce((s, c) => s + c.pointsAwarded, 0);
+  const ageHours = (now - input.createdAt.getTime()) / 36e5;
+  const points = input.completions.reduce((s, c) => s + c.pointsAwarded, 0);
 
-  if (user.lastIp && user.lastIp !== "unknown") {
-    const sameIp = await prisma.user.count({
-      where: { lastIp: user.lastIp, NOT: { id: userId } },
+  if (input.lastIp && input.lastIp !== "unknown" && input.sameIpOthers >= 2) {
+    flags.push({
+      code: "IP_CLUSTER",
+      severity: input.sameIpOthers >= 4 ? "high" : "medium",
+      label: `${input.sameIpOthers + 1} accounts have used IP ${input.lastIp}`,
     });
-    if (sameIp >= 2) {
-      flags.push({
-        code: "IP_CLUSTER",
-        severity: sameIp >= 4 ? "high" : "medium",
-        label: `${sameIp + 1} accounts have used IP ${user.lastIp}`,
-      });
-    }
   }
 
-  const fails = user.auditEvents.filter((e) => e.type === "VERIFY_FAIL").length;
+  const fails = input.auditEvents.filter((e) => e.type === "VERIFY_FAIL").length;
   if (fails >= 5) {
     flags.push({
       code: "VERIFY_FAILURES",
@@ -60,7 +57,7 @@ export async function recomputeRisk(userId: string): Promise<{ score: number; fl
     });
   }
 
-  const sybilBlocks = user.auditEvents.filter((e) => e.type === "SYBIL_BLOCK").length;
+  const sybilBlocks = input.auditEvents.filter((e) => e.type === "SYBIL_BLOCK").length;
   if (sybilBlocks >= 1) {
     flags.push({
       code: "IDENTITY_REUSE",
@@ -70,7 +67,7 @@ export async function recomputeRisk(userId: string): Promise<{ score: number; fl
   }
 
   const tenMin = now - 10 * 60_000;
-  const burst = user.completions.filter((c) => c.verifiedAt.getTime() >= tenMin).length;
+  const burst = input.completions.filter((c) => c.verifiedAt.getTime() >= tenMin).length;
   if (burst >= 3) {
     flags.push({
       code: "BURST_COMPLETIONS",
@@ -87,7 +84,7 @@ export async function recomputeRisk(userId: string): Promise<{ score: number; fl
     });
   }
 
-  if (!user.xUserId && !user.discordId) {
+  if (!input.xUserId && !input.discordId) {
     flags.push({
       code: "NO_SOCIAL",
       severity: "medium",
@@ -95,26 +92,48 @@ export async function recomputeRisk(userId: string): Promise<{ score: number; fl
     });
   }
 
-  if (user.xUserId && user.discordId) {
-    const xClash = await prisma.user.count({
-      where: { xUserId: user.xUserId, NOT: { id: userId } },
+  if (input.socialClash) {
+    flags.push({
+      code: "SOCIAL_COLLISION",
+      severity: "high",
+      label: "X or Discord id also present on another user row",
     });
-    const dClash = await prisma.user.count({
-      where: { discordId: user.discordId, NOT: { id: userId } },
-    });
-    if (xClash || dClash) {
-      flags.push({
-        code: "SOCIAL_COLLISION",
-        severity: "high",
-        label: "X or Discord id also present on another user row",
-      });
-    }
   }
 
   const score = Math.min(
     100,
     flags.reduce((s, f) => s + (f.severity === "high" ? 35 : f.severity === "medium" ? 18 : 8), 0)
   );
+  return { score, flags };
+}
+
+export async function recomputeRisk(userId: string): Promise<{ score: number; flags: RiskFlag[] }> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      completions: { select: { pointsAwarded: true, verifiedAt: true } },
+      auditEvents: { orderBy: { createdAt: "desc" }, take: 50, select: { type: true } },
+    },
+  });
+  if (!user) return { score: 0, flags: [] };
+
+  let sameIpOthers = 0;
+  if (user.lastIp && user.lastIp !== "unknown") {
+    sameIpOthers = await prisma.user.count({
+      where: { lastIp: user.lastIp, NOT: { id: userId } },
+    });
+  }
+
+  const { score, flags } = assessRisk({
+    createdAt: user.createdAt,
+    lastIp: user.lastIp,
+    xUserId: user.xUserId,
+    discordId: user.discordId,
+    completions: user.completions,
+    auditEvents: user.auditEvents,
+    sameIpOthers,
+    socialClash: false,
+  });
 
   await prisma.user.update({ where: { id: userId }, data: { riskScore: score } });
   return { score, flags };

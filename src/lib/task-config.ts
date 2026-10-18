@@ -55,6 +55,12 @@ export const X_FOLLOW_RESOLVES: ResponseResolve[] = [
 // https://x.com/i/api/graphql/.* /UserByScreenName\?.*
 export const HUB_X_FOLLOW_TEMPLATE_ID = "674142ce-d852-4c1d-9ca3-3061ace98988";
 
+// Hub template "X post mention". Captured on one profile; launch_page opens the logged-in user.
+export const HUB_X_POST_TEMPLATE_ID = "32bcf006-68f7-4081-a3ab-774b2fa0bce4";
+
+// Hub template "Discord server membership". Proves the user can read this Primus Labs channel.
+export const HUB_DISCORD_TEMPLATE_ID = "18d209ca-2c22-436c-9d77-d16f10a145a8";
+
 /** Older Hub templates that baked a query hash and fail with Primus 00013. */
 export const STALE_X_FOLLOW_TEMPLATE_IDS = new Set([
   "771b3096-cccb-4c6f-bca8-86497ece202b",
@@ -67,9 +73,20 @@ export const STALE_X_FOLLOW_TEMPLATE_IDS = new Set([
 export const USER_BY_SCREEN_NAME_REQUEST_PATTERN =
   "https://x.com/i/api/graphql/.*/UserByScreenName\\?.*";
 
-// Hub matcher for a user's tweet timeline. X rotates the query id the same way.
+// Profile Posts tab. X now calls UserOriginalsTimeline, not UserTweets.
 export const USER_TWEETS_REQUEST_PATTERN =
-  "https://x.com/i/api/graphql/.*/UserTweets\\?.*";
+  "https://x.com/i/api/graphql/.*/UserOriginalsTimeline\\?.*";
+
+// Logged-in Discord user's server list or one server's member record.
+export const DISCORD_MEMBER_REQUEST_PATTERN =
+  "https://discord.com/api/.*/users/@me/guilds.*";
+
+export function discordChannelUrl(guildId: string) {
+  const channel = (process.env.DISCORD_CHANNEL_ID || "1125705611942834268").trim();
+  return channel
+    ? `https://discord.com/channels/${guildId}/${channel}`
+    : `https://discord.com/channels/${guildId}`;
+}
 
 /** X GraphQL rejects UserByScreenName without these; missing them is Primus 00013. */
 export const USER_BY_SCREEN_NAME_FEATURES = {
@@ -121,7 +138,9 @@ export function wildcardXGraphqlUrl(url?: string | null) {
   if (!match) return url;
   const operation = match[1];
   if (/^UserByScreenName$/i.test(operation)) return USER_BY_SCREEN_NAME_REQUEST_PATTERN;
-  if (/^UserTweets$/i.test(operation)) return USER_TWEETS_REQUEST_PATTERN;
+  if (/^UserTweets$/i.test(operation) || /^UserOriginalsTimeline$/i.test(operation)) {
+    return USER_TWEETS_REQUEST_PATTERN;
+  }
   return `https://x.com/i/api/graphql/.*/${operation}\\?.*`;
 }
 
@@ -205,11 +224,17 @@ export function defaultXFollowConfig(handle: string): TaskConfig {
 
 export function defaultTemplateForTask(type: string, stored?: string | null) {
   if (type === "X_FOLLOW") return resolveXFollowTemplateId(stored);
-  if (stored && stored.trim()) return stored.trim();
   if (type === "X_POST") {
-    return (process.env.PRIMUS_TEMPLATE_X_POST || "").trim() || resolveXFollowTemplateId(null);
+    return (process.env.PRIMUS_TEMPLATE_X_POST || "").trim() || HUB_X_POST_TEMPLATE_ID;
   }
-  if (type === "DISCORD_JOIN") return process.env.PRIMUS_TEMPLATE_DISCORD_JOIN || null;
+  if (type === "DISCORD_JOIN" || type === "DISCORD_ROLE") {
+    return (
+      (process.env.PRIMUS_TEMPLATE_DISCORD_JOIN || "").trim() ||
+      (process.env.PRIMUS_TEMPLATE_DISCORD_ROLE || "").trim() ||
+      HUB_DISCORD_TEMPLATE_ID
+    );
+  }
+  if (stored && stored.trim()) return stored.trim();
   return null;
 }
 

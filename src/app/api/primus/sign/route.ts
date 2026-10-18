@@ -8,10 +8,13 @@ import {
   dataSourceHandle,
   normalizeXHandle,
   parseTaskConfig,
+  DISCORD_MEMBER_REQUEST_PATTERN,
   USER_TWEETS_REQUEST_PATTERN,
+  discordChannelUrl,
   wildcardUserByScreenNameUrl,
   wildcardXGraphqlUrl,
 } from "@/lib/task-config";
+import { discordGuildId } from "@/lib/discord";
 
 export const dynamic = "force-dynamic";
 
@@ -47,11 +50,14 @@ export async function POST(req: Request) {
   const taskId = typeof body?.taskId === "string" ? body.taskId : "";
   let taskType = "";
   let configHandle = "";
+  let guildId = "";
   if (taskId) {
     const task = await prisma.task.findUnique({ where: { id: taskId } });
     if (task) {
       taskType = task.type;
-      configHandle = normalizeXHandle(parseTaskConfig(task.config).handle);
+      const config = parseTaskConfig(task.config);
+      configHandle = normalizeXHandle(config.handle);
+      guildId = discordGuildId(config.guildId);
     }
   }
 
@@ -59,6 +65,7 @@ export async function POST(req: Request) {
     taskType,
     questHandle: configHandle,
     userHandle: normalizeXHandle(user.xHandle),
+    guildId,
   });
 
   try {
@@ -71,10 +78,16 @@ export async function POST(req: Request) {
   }
 }
 
-function rewriteUrl(url: string, handle: string, taskType: string) {
+function rewriteUrl(url: string, handle: string, taskType: string, guildId = "") {
+  if (!url) return url;
+  if (taskType === "DISCORD_JOIN" || taskType === "DISCORD_ROLE") {
+    if (/discord\.com\/api\/.*\/users\/@me\/guilds/i.test(url)) return DISCORD_MEMBER_REQUEST_PATTERN;
+    if (guildId && /^https:\/\/discord\.com\/channels\/\d+/i.test(url)) return discordChannelUrl(guildId);
+    return url;
+  }
   if (taskType === "X_POST") {
     if (/\/i\/api\/graphql\//i.test(url)) {
-      if (/UserByScreenName/i.test(url) || /UserTweets/i.test(url)) {
+      if (/UserByScreenName/i.test(url) || /UserTweets/i.test(url) || /UserOriginalsTimeline/i.test(url)) {
         return USER_TWEETS_REQUEST_PATTERN;
       }
       return wildcardXGraphqlUrl(url);
@@ -95,7 +108,7 @@ function rewriteUrl(url: string, handle: string, taskType: string) {
 
 function wildcardSignParams(
   parsed: Record<string, unknown>,
-  ctx: { taskType: string; questHandle: string; userHandle: string }
+  ctx: { taskType: string; questHandle: string; userHandle: string; guildId: string }
 ) {
   let extraHandle = "";
   try {
@@ -111,14 +124,15 @@ function wildcardSignParams(
     extraHandle = "";
   }
 
-  const handle = dataSourceHandle(
-    ctx.taskType || (ctx.questHandle ? "X_FOLLOW" : "X_POST"),
-    { handle: ctx.questHandle || extraHandle },
-    ctx.userHandle || extraHandle
-  );
+  const discordTask = ctx.taskType === "DISCORD_JOIN" || ctx.taskType === "DISCORD_ROLE";
+  const handle = discordTask
+    ? ""
+    : ctx.taskType
+      ? dataSourceHandle(ctx.taskType, { handle: ctx.questHandle || extraHandle }, ctx.userHandle || extraHandle)
+      : extraHandle || ctx.questHandle || ctx.userHandle;
+  const launchPage = discordTask && ctx.guildId ? discordChannelUrl(ctx.guildId) : handle ? `https://x.com/${handle}` : "";
 
-  if (handle) {
-    const launchPage = `https://x.com/${handle}`;
+  if (launchPage) {
     const mergeLaunch = (raw: unknown) => {
       let extra: Record<string, unknown> = {};
       if (typeof raw === "string") {
@@ -130,7 +144,8 @@ function wildcardSignParams(
       } else if (raw && typeof raw === "object") {
         extra = { ...(raw as Record<string, unknown>) };
       }
-      extra.handle = handle;
+      if (handle) extra.handle = handle;
+      if (ctx.guildId) extra.guildId = ctx.guildId;
       extra.launch_page = launchPage;
       return JSON.stringify(extra);
     };
@@ -141,8 +156,8 @@ function wildcardSignParams(
   const apply = (node: unknown) => {
     if (!node || typeof node !== "object") return;
     const rec = node as Record<string, unknown>;
-    if (typeof rec.url === "string") rec.url = rewriteUrl(rec.url, handle, ctx.taskType);
-    if (typeof rec.backUrl === "string") rec.backUrl = rewriteUrl(rec.backUrl, handle, ctx.taskType);
+    if (typeof rec.url === "string") rec.url = rewriteUrl(rec.url, handle, ctx.taskType, ctx.guildId);
+    if (typeof rec.backUrl === "string") rec.backUrl = rewriteUrl(rec.backUrl, handle, ctx.taskType, ctx.guildId);
     if (rec.request && typeof rec.request === "object") apply(rec.request);
     if (rec.attRequest && typeof rec.attRequest === "object") apply(rec.attRequest);
   };

@@ -7,8 +7,6 @@ type Me = {
   id: string;
   displayName: string;
   walletAddress: string | null;
-  email: string | null;
-  emailVerified: boolean;
   xHandle: string | null;
   discordUsername: string | null;
   discordId: string | null;
@@ -17,8 +15,6 @@ type Me = {
 
 export default function AccountPage() {
   const [me, setMe] = useState<Me | null>(null);
-  const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
   const [info, setInfo] = useState("");
   const [loaded, setLoaded] = useState(false);
 
@@ -26,7 +22,6 @@ export default function AccountPage() {
     const res = await fetch("/api/auth/me");
     const json = await res.json();
     setMe(json.user);
-    if (json.user?.email) setEmail(json.user.email);
     setLoaded(true);
   }
 
@@ -62,7 +57,7 @@ export default function AccountPage() {
       <p className="kicker">Player</p>
       <h1 className="display page-title">Account</h1>
       <p className="hero-copy">
-        Signed in as {me.displayName}. Wallet is optional. X proofs still go through Primus zkTLS.
+        Signed in as {me.displayName}. Wallet is optional. Proofs go through Primus zkTLS.
       </p>
       <p className="points mt-3 text-sm">{me.points} points</p>
 
@@ -90,55 +85,6 @@ export default function AccountPage() {
             )}
           </div>
         </div>
-      </section>
-
-      <section className="panel">
-        <p className="kicker">Email OTP</p>
-        <input
-          className="field"
-          placeholder="you@email.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <button
-          className="btn-ghost mt-3"
-          onClick={async () => {
-            const res = await fetch("/api/account/email/request-otp", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email }),
-            });
-            const json = await res.json();
-            setInfo(json.devCode ? `Dev code: ${json.devCode}` : json.error || "Code sent");
-          }}
-        >
-          Send code
-        </button>
-        <input
-          className="field"
-          placeholder="6-digit code"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-        />
-        <button
-          className="btn-primary mt-3"
-          onClick={async () => {
-            const res = await fetch("/api/account/email/verify-otp", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email, code }),
-            });
-            const json = await res.json();
-            if (!res.ok) setInfo(json.error);
-            else {
-              setInfo("Email verified");
-              load();
-            }
-          }}
-        >
-          Confirm email
-        </button>
-        {me.emailVerified && <p className="mt-3 text-sm text-[var(--ok)]">Verified {me.email}</p>}
       </section>
 
       <section className="panel">

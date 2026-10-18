@@ -33,7 +33,7 @@ Open http://localhost:3000
 
 ## Discord
 
-Hybrid (spec option B): if `DISCORD_BOT_TOKEN` and a linked Discord user exist, join/role tasks use Discord’s API. Otherwise submit a Primus attestation the same way as X.
+Join and role quests use a Primus zkTLS proof from the Discord website. The user must be logged into Discord in the same Chrome profile.
 
 ## Security
 

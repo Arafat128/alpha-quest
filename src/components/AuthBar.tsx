@@ -19,17 +19,17 @@ export default function AuthBar() {
       .catch(() => setMe(null));
   }, []);
 
-  if (me === undefined) return <span className="text-xs text-slate-500">…</span>;
+  if (me === undefined) return <span className="px-3 text-xs text-slate-500">…</span>;
 
   if (!me) {
     return (
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         {admin && (
-          <Link href="/admin" className="text-xs text-slate-400 hover:text-white">
+          <Link href="/admin" className="hidden px-2 text-xs text-slate-400 hover:text-white sm:inline">
             Admin
           </Link>
         )}
-        <Link href="/login" className="btn-primary text-xs">
+        <Link href="/login" className="btn-primary px-4 py-2 text-xs">
           Log in
         </Link>
       </div>
@@ -37,17 +37,20 @@ export default function AuthBar() {
   }
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2">
       {admin && (
-        <Link href="/admin" className="text-xs text-slate-400 hover:text-white">
+        <Link href="/admin" className="hidden px-2 text-xs text-slate-400 hover:text-white sm:inline">
           Admin
         </Link>
       )}
-      <Link href="/account" className="text-xs text-sky-200">
+      <Link
+        href="/account"
+        className="max-w-[9rem] truncate rounded-full bg-white/5 px-3 py-2 text-xs text-slate-200 hover:text-white"
+      >
         {me.displayName}
       </Link>
       <button
-        className="btn-ghost text-xs"
+        className="btn-ghost px-3 py-2 text-xs"
         onClick={async () => {
           await fetch("/api/auth/logout", { method: "POST" });
           window.location.href = "/";

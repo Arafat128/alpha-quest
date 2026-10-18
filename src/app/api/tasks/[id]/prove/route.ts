@@ -8,6 +8,8 @@ import {
   dataSourceHandle,
 } from "@/lib/task-config";
 import { boundAddress } from "@/lib/identity";
+import { discordGuildId } from "@/lib/discord";
+import { discordChannelUrl } from "@/lib/task-config";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,8 @@ export async function GET(
 
   const config = parseTaskConfig(task.config);
   const handle = dataSourceHandle(task.type, config, user.xHandle);
+  const guildId =
+    task.type === "DISCORD_JOIN" || task.type === "DISCORD_ROLE" ? discordGuildId(config.guildId) : "";
   if (task.type === "X_POST" && !handle) {
     return NextResponse.json({ error: "Log in with X first" }, { status: 400 });
   }
@@ -33,6 +37,8 @@ export async function GET(
     taskId: task.id,
     type: task.type,
     handle,
+    guildId,
+    launchPage: guildId ? discordChannelUrl(guildId) : "",
     templateId: defaultTemplateForTask(task.type, task.primusTemplateId),
     boundAddress: boundAddress(user.id, user.walletAddress),
     request: follow?.request || config.request || null,

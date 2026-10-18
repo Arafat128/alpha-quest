@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   getPrimusSigner,
+  primusSignatureOk,
   flattenAttestationData,
   followFlagFromProof,
   extractIdentity,
@@ -25,7 +26,7 @@ import { Prisma } from "@prisma/client";
 import { boundAddress } from "@/lib/identity";
 import { logAudit, recomputeRisk } from "@/lib/risk";
 import { clientIp } from "@/lib/session";
-import { discordGuildId, fetchDiscordMember } from "@/lib/discord";
+import { discordChannelId, discordGuildId } from "@/lib/discord";
 
 export const dynamic = "force-dynamic";
 
@@ -73,34 +74,6 @@ export async function POST(
       { source: "x-oauth-owner", handle: user.xHandle },
       req
     );
-  }
-
-  if (task.type === "EMAIL_VERIFY") {
-    if (!user.emailVerifiedAt) {
-      return NextResponse.json({ error: "Verify email on the Account page first" }, { status: 400 });
-    }
-    return complete(user.id, task, "email", user.email || user.id, { source: "email-otp" }, req);
-  }
-
-  if (task.type === "DISCORD_JOIN" || task.type === "DISCORD_ROLE") {
-    if (!user.discordId) {
-      return NextResponse.json({ error: "Connect Discord on the Account page first" }, { status: 400 });
-    }
-    const guildId = discordGuildId(config.guildId);
-    if (!guildId) {
-      return NextResponse.json({ error: "This quest has no Discord server configured" }, { status: 400 });
-    }
-    const member = await fetchDiscordMember(guildId, user.discordId);
-    if (!member.ok) {
-      return NextResponse.json({ error: member.error }, { status: 400 });
-    }
-    if (task.type === "DISCORD_ROLE" && config.roleId) {
-      const roles = Array.isArray(member.roles) ? member.roles : [];
-      if (!roles.includes(config.roleId)) {
-        return NextResponse.json({ error: "That Discord role is not on your account yet" }, { status: 400 });
-      }
-    }
-    return complete(user.id, task, "discord", user.discordId, { source: "discord-bot", guildId }, req);
   }
 
   const attestation = body?.attestation as Record<string, unknown> | undefined;
@@ -152,9 +125,8 @@ export async function POST(
   }
 
   try {
-    const zk = await getPrimusSigner();
-    const sigOk = zk.verifyAttestation(attestation as never);
-    if (sigOk !== true) {
+    await getPrimusSigner();
+    if (!primusSignatureOk(attestation)) {
       return NextResponse.json({ error: "Primus signature check failed" }, { status: 400 });
     }
   } catch (error) {
@@ -169,6 +141,33 @@ export async function POST(
 
   const data = flattenAttestationData(attestation);
   const extras = (body?.extras && typeof body.extras === "object" ? body.extras : {}) as Record<string, unknown>;
+  if (task.type === "DISCORD_JOIN" || task.type === "DISCORD_ROLE") {
+    if (!user.discordId) {
+      return NextResponse.json({ error: "Connect Discord on the Account page first" }, { status: 400 });
+    }
+    const guildId = discordGuildId(config.guildId);
+    if (!guildId) {
+      return NextResponse.json({ error: "This quest has no Discord server configured" }, { status: 400 });
+    }
+    const blob = JSON.stringify({ data, extras, attestation }).toLowerCase();
+    const channelId = discordChannelId();
+    if (!blob.includes(guildId.toLowerCase()) && !blob.includes(channelId.toLowerCase())) {
+      return NextResponse.json(
+        {
+          error: "This proof does not show membership in the campaign Discord. Stay in that server in the tab Primus opens, then Verify again.",
+        },
+        { status: 400 }
+      );
+    }
+    if (task.type === "DISCORD_ROLE" && config.roleId && !blob.includes(config.roleId.toLowerCase())) {
+      return NextResponse.json(
+        { error: "This proof does not include the required Discord role." },
+        { status: 400 }
+      );
+    }
+    return complete(user.id, task, "discord", user.discordId, attestation, req);
+  }
+
   if (task.type === "X_FOLLOW") {
     const requestUrl =
       (attestation.request as { url?: string } | undefined)?.url ||
@@ -239,7 +238,6 @@ function completerIdentity(
     xUserId: string | null;
     xHandle: string | null;
     discordId: string | null;
-    email: string | null;
   },
   data: Record<string, unknown>
 ) {
@@ -251,9 +249,6 @@ function completerIdentity(
   }
   if (taskType.startsWith("DISCORD")) {
     return user.discordId || user.id;
-  }
-  if (taskType === "EMAIL_VERIFY") {
-    return user.email || user.id;
   }
   return extractIdentity(data, "x") || user.xUserId || user.xHandle || user.id;
 }
@@ -287,6 +282,12 @@ async function complete(
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const target = Array.isArray(error.meta?.target)
+        ? error.meta.target.join(",")
+        : String(error.meta?.target || "");
+      if (target.includes("userId")) {
+        return NextResponse.json({ ok: true, already: true, pointsAwarded: task.points });
+      }
       await logAudit({
         userId,
         type: "SYBIL_BLOCK",

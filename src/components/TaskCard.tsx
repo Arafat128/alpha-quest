@@ -54,7 +54,7 @@ export default function TaskCard({
         <p className="desc">{task.description}</p>
         {(task.type === "DISCORD_JOIN" || task.type === "DISCORD_ROLE") && (
           <p className="desc">
-            Join the server first. We check Discord membership with the bot
+            Join the server first. Primus proves you can read the campaign channel
             {task.config.inviteUrl ? (
               <>
                 {" — "}
