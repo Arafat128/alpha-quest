@@ -54,7 +54,7 @@ const VerifyButton = forwardRef<VerifyHandle, Props>(function VerifyButton(
     try {
       const meRes = await fetch("/api/auth/me");
       const me = await meRes.json();
-      if (!me.user?.id) throw new Error("Log in with X or Discord first");
+      if (!me.user?.id) throw new Error("Log in with Discord first");
 
       const norm = (s?: string | null) => (s || "").replace(/^@/, "").trim().toLowerCase();
       if (
@@ -92,15 +92,10 @@ const VerifyButton = forwardRef<VerifyHandle, Props>(function VerifyButton(
         return;
       }
 
-      if (type === "X_POST" && !me.user.xHandle) {
-        window.location.href = "/api/auth/x?intent=link";
-        throw new Error("Connect X first, then click the task again.");
-      }
-
       await startPrimusProof({
         taskId,
         templateId: primusTemplateId,
-        handle: type === "X_POST" ? me.user.xHandle : config.handle,
+        handle: type === "X_POST" ? me.user.xHandle || "" : config.handle,
         taskType: type,
         user: { id: me.user.id, boundAddress: me.user.boundAddress },
         onStatus: setMsg,

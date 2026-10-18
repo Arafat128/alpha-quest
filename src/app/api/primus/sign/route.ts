@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   await awaitDb();
   const { user } = await requireUser();
-  if (!user) return NextResponse.json({ error: "Log in with X or Discord first" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Log in with Discord first" }, { status: 401 });
 
   const limited = await rateLimit(`sign:${user.id}`, 20, 60_000);
   if (!limited.ok) {
@@ -130,7 +130,14 @@ function wildcardSignParams(
     : ctx.taskType
       ? dataSourceHandle(ctx.taskType, { handle: ctx.questHandle || extraHandle }, ctx.userHandle || extraHandle)
       : extraHandle || ctx.questHandle || ctx.userHandle;
-  const launchPage = discordTask && ctx.guildId ? discordChannelUrl(ctx.guildId) : handle ? `https://x.com/${handle}` : "";
+  const launchPage =
+    discordTask && ctx.guildId
+      ? discordChannelUrl(ctx.guildId)
+      : ctx.taskType === "X_POST"
+        ? `https://x.com/${handle || "home"}`
+        : handle
+          ? `https://x.com/${handle}`
+          : "";
 
   if (launchPage) {
     const mergeLaunch = (raw: unknown) => {

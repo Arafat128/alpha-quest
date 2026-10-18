@@ -33,11 +33,11 @@ export default function HomeHero({
         <p className="hero-copy">
           {loggedIn
             ? `Signed in as ${name}. Open a campaign and verify tasks — X actions still use Primus zkTLS.`
-            : "Log in with X or Discord. Follows and posts are attested from your live browser session, not a checkbox."}
+            : "Log in with Discord. Follows and posts are attested from your live browser session, not a checkbox."}
         </p>
         {loggedIn === false && (
           <a href="/login" className="btn-primary mt-8">
-            Log in with X or Discord
+            Log in with Discord
           </a>
         )}
         {loggedIn === true && (
@@ -55,7 +55,7 @@ export default function HomeHero({
         <ol>
           <li>
             <span>01</span>
-            Sign in with X or Discord
+            Sign in with Discord
           </li>
           <li>
             <span>02</span>

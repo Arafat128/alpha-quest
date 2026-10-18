@@ -82,7 +82,7 @@ async function runBase(browser, base) {
     const x = page.getByRole("link", { name: /Continue with X/i });
     const d = page.getByRole("link", { name: /Continue with Discord/i });
     await d.waitFor({ state: "visible", timeout: 15000 });
-    log((await x.count()) >= 1 && (await d.count()) >= 1, host, "login buttons", `x=${await x.count()} d=${await d.count()}`);
+    log((await x.count()) === 0 && (await d.count()) >= 1, host, "login buttons", `x=${await x.count()} d=${await d.count()}`);
 
     await page.goto(base + "/account", { waitUntil: "domcontentloaded" });
     log((await page.getByText("Account").count()) > 0, host, "account page", page.url());

@@ -41,7 +41,7 @@ export default function AccountPage() {
       <div>
         <p className="kicker">Player</p>
         <h1 className="display page-title">Account</h1>
-        <p className="hero-copy">Log in with X or Discord to continue.</p>
+        <p className="hero-copy">Log in with Discord to continue.</p>
         <a href="/login" className="btn-primary mt-6">
           Log in
         </a>
@@ -64,16 +64,6 @@ export default function AccountPage() {
       <section className="panel">
         <p className="kicker">Social</p>
         <div className="mt-2">
-          <div className="row">
-            <span className="text-sm">X</span>
-            {me.xHandle ? (
-              <span className="chip">Connected @{me.xHandle}</span>
-            ) : (
-              <a className="btn-ghost text-xs" href="/api/auth/x?intent=link">
-                Link X
-              </a>
-            )}
-          </div>
           <div className="row">
             <span className="text-sm">Discord</span>
             {discordConnected ? (

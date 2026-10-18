@@ -7,7 +7,7 @@ export async function POST(req: Request) {
   const session = await getSession();
   if (!session.userId) {
     return NextResponse.json(
-      { error: "Log in with X or Discord first. Wallet is optional." },
+      { error: "Log in with Discord first. Wallet is optional." },
       { status: 401 }
     );
   }

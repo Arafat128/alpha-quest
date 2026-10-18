@@ -19,7 +19,7 @@ export async function GET(
 ) {
   await awaitDb();
   const { user } = await requireUser();
-  if (!user) return NextResponse.json({ error: "Log in with X or Discord first" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Log in with Discord first" }, { status: 401 });
 
   const task = await prisma.task.findUnique({ where: { id: params.id } });
   if (!task) return NextResponse.json({ error: "Unknown task" }, { status: 404 });
@@ -28,9 +28,6 @@ export async function GET(
   const handle = dataSourceHandle(task.type, config, user.xHandle);
   const guildId =
     task.type === "DISCORD_JOIN" || task.type === "DISCORD_ROLE" ? discordGuildId(config.guildId) : "";
-  if (task.type === "X_POST" && !handle) {
-    return NextResponse.json({ error: "Log in with X first" }, { status: 400 });
-  }
   const follow = task.type === "X_FOLLOW" && handle ? defaultXFollowConfig(handle) : null;
 
   return NextResponse.json({

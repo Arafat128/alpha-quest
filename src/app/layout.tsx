@@ -27,7 +27,7 @@ const display = Instrument_Serif({
 
 export const metadata: Metadata = {
   title: "Alpha Quest",
-  description: "Quests verified with Primus zkTLS. Log in with X or Discord.",
+  description: "Quests verified with Primus zkTLS. Log in with Discord.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

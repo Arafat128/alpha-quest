@@ -36,7 +36,7 @@ export async function POST(
 ) {
   await awaitDb();
   const { user } = await requireUser();
-  if (!user) return NextResponse.json({ error: "Log in with X or Discord first" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Log in with Discord first" }, { status: 401 });
 
   const limited = await rateLimit(`verify:${user.id}`, 12, 60_000);
   if (!limited.ok) {
@@ -203,14 +203,6 @@ export async function POST(
       ((attestation.attRequest as { request?: { url?: string } } | undefined)?.request?.url);
     const attestedHandle =
       extractAttestedXHandle(data, attestation) || xHandleFromRequestUrl(requestUrl || null);
-    if (user.xHandle && attestedHandle && !sameXHandle(attestedHandle, user.xHandle)) {
-      return NextResponse.json(
-        {
-          error: `This proof is for @${attestedHandle}, but this quest verifies your posts. Stay on your profile @${user.xHandle} in the tab Primus opens, then Verify again.`,
-        },
-        { status: 400 }
-      );
-    }
     if (config.mention) {
       const blob = JSON.stringify({ data, extras }).toLowerCase();
       if (!blob.includes(config.mention.toLowerCase())) {
@@ -245,7 +237,7 @@ function completerIdentity(
     return user.xUserId || user.xHandle || user.id;
   }
   if (taskType === "X_POST") {
-    return user.xUserId || user.xHandle || extractIdentity(data, "x") || user.id;
+    return extractIdentity(data, "x") || user.xUserId || user.xHandle || user.id;
   }
   if (taskType.startsWith("DISCORD")) {
     return user.discordId || user.id;

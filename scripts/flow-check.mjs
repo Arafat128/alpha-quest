@@ -168,15 +168,6 @@ async function runHost(base) {
     record(host, "GET /api/auth/discord redirect", true, loc.slice(0, 80));
   });
 
-  await check(host, "GET /api/auth/x redirect", async () => {
-    const r = await req("/api/auth/x");
-    const loc = r.headers.get("location") || "";
-    if (r.status !== 307 && r.status !== 302) throw new Error(`status ${r.status}`);
-    if (!loc.includes("x.com") && !loc.includes("twitter.com")) throw new Error(`location ${loc}`);
-    if (!loc.includes("tweet.read")) throw new Error("missing tweet.read scope");
-    record(host, "GET /api/auth/x redirect", true, loc.slice(0, 80));
-  });
-
   await check(host, "POST /api/admin/login", async () => {
     const r = await req("/api/admin/login", {
       method: "POST",

@@ -20,10 +20,7 @@ function LoginInner() {
       .catch(() => {});
   }, []);
   const messages: Record<string, string> = {
-    x_not_configured: "X login is not available yet. Use Discord, or try again later.",
     discord_not_configured: "Discord login is not available yet. Try again later.",
-    x_denied: "X login was cancelled.",
-    x_failed: "X login failed.",
     discord_denied: "Discord login was cancelled.",
     discord_failed: "Discord login failed.",
   };
@@ -33,15 +30,11 @@ function LoginInner() {
       <p className="kicker">Alpha Quest</p>
       <h1 className="display page-title">{already ? "Already signed in" : "Log in"}</h1>
       <p className="hero-copy">
-        No wallet required. Sign in with X or Discord. Task proofs still use Primus zkTLS against
-        your live session.
+        No wallet required. Sign in with Discord. X and Discord proofs still use Primus zkTLS in this browser.
       </p>
       {error && <p className="note">{messages[error] || error}</p>}
       <div className="login-actions">
-        <a className="btn-primary" data-testid="login-x" href="/api/auth/x">
-          Continue with X
-        </a>
-        <a className="btn-ghost" data-testid="login-discord" href="/api/auth/discord">
+        <a className="btn-primary" data-testid="login-discord" href="/api/auth/discord">
           Continue with Discord
         </a>
       </div>
