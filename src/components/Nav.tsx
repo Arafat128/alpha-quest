@@ -10,7 +10,7 @@ export default function Nav() {
         Alpha Quest
       </Link>
       <nav className="nav-links">
-        <Link href="/">Campaigns</Link>
+        <Link href="/#proofs">Proofs</Link>
         <Link href="/leaderboard">Board</Link>
       </nav>
     </header>

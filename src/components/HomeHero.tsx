@@ -1,23 +1,18 @@
-export default function HomeHero({
-  campaigns,
-  tasks,
-}: {
-  campaigns: number;
-  tasks: number;
-}) {
+export default function HomeHero() {
   return (
     <section className="hero">
       <div>
-        <p className="kicker">Primus zkTLS · no account</p>
+        <p className="kicker">Primus zkTLS</p>
         <h1 className="display">
-          Prove the action.
-          <em> Keep the session yours.</em>
+          Prove a fact.
+          <em> Leave the rest private.</em>
         </h1>
         <p className="hero-copy">
-          No login. Open a campaign and click a task. Primus zkTLS proves it from the X or Discord
-          session already open in this browser. {campaigns} campaigns, {tasks} tasks.
+          Show that something on a site is true, without handing over the account behind it. Primus
+          checks one live page in this browser and returns a proof of that fact. The password, the
+          rest of the page, and everything you did not agree to show stay where they are.
         </p>
-        <a href="#campaigns" className="btn-primary mt-8">
+        <a href="#proofs" className="btn-primary mt-8">
           Try a proof
         </a>
       </div>
@@ -26,25 +21,23 @@ export default function HomeHero({
           <span>AQ-01</span>
           <span>Live session</span>
         </div>
-        <p className="slip-title">Attestation</p>
+        <p className="slip-title">What happens</p>
         <ol>
           <li>
             <span>01</span>
-            Open a campaign
+            You are already logged in, in this browser
           </li>
           <li>
             <span>02</span>
-            Do the action in your own browser
+            Primus opens that site and reads one check
           </li>
           <li>
             <span>03</span>
-            zkTLS proves it. The session stays local
+            This page receives the proof, not your private data
           </li>
         </ol>
         <div className="slip-foot">
-          <span className="seal">
-            {String(campaigns).padStart(2, "0")} campaigns · {tasks} tasks
-          </span>
+          <span className="seal">X follow · X post · Discord</span>
           <span>Primus</span>
         </div>
       </aside>
