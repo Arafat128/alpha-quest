@@ -23,6 +23,20 @@ export type TaskView = {
   };
 };
 
+function openQuip(type: string) {
+  if (type === "X_FOLLOW") return "Prove the follow. The rest of the timeline stays put.";
+  if (type === "X_POST") return "One post is enough. The drafts stay yours.";
+  if (type === "DISCORD_JOIN" || type === "DISCORD_ROLE") return "Prove you can open the door. The chat stays in Discord.";
+  return "One fact, checked. Everything else stays in the browser.";
+}
+
+function doneQuip(type: string) {
+  if (type === "X_FOLLOW") return "Followed, and proved. Nothing else left the tab.";
+  if (type === "X_POST") return "That post counts. The other ones do not.";
+  if (type === "DISCORD_JOIN" || type === "DISCORD_ROLE") return "You are in. The memes were not part of the deal.";
+  return "Proved. The private bits never made the trip.";
+}
+
 export default function TaskCard({
   task,
   onDone,
@@ -43,6 +57,8 @@ export default function TaskCard({
     if (!clickable) return;
     verifyRef.current?.start();
   }
+
+  const quip = verified ? doneQuip(task.type) : openQuip(task.type);
 
   return (
     <article
@@ -78,7 +94,7 @@ export default function TaskCard({
         )}
       </div>
       <div className="task-side">
-        <p className="pts">{task.points} pts</p>
+        <p className="pts">{quip}</p>
         <VerifyButton
           ref={verifyRef}
           taskId={task.id}
