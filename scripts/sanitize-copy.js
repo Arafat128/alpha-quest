@@ -11,7 +11,7 @@ async function main() {
   await p.task.updateMany({
     where: { type: "X_FOLLOW" },
     data: {
-      description: "Follow @example_owner on X. We verify the follow from your live X session.",
+      description: "Follow the account on X. We verify the follow from your live X session.",
     },
   });
   await p.task.updateMany({

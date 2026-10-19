@@ -233,7 +233,7 @@ export default function AdminPage() {
             <>
               <input
                 className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm"
-                placeholder="X handle to follow (any username, e.g. example_user)"
+                placeholder="X handle to follow (any username)"
                 value={handle}
                 onChange={(e) => setHandle(e.target.value)}
               />

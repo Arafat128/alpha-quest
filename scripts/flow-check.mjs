@@ -240,7 +240,7 @@ async function runHost(base) {
     const sample = (body.tasks || []).find(
       (t) => (t.config?.handle || "").toLowerCase() === "example_user"
     );
-    if (!sample) throw new Error("example_user task not in campaign tasks");
+    if (!sample) throw new Error("example follow task not in campaign tasks");
     if (!sample.primusTemplateId) throw new Error("any-handle follow missing shared template id");
     record(host, "POST admin any-handle X_FOLLOW uses shared template", true, sample.primusTemplateId.slice(0, 8));
   });

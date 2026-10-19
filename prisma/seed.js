@@ -3,7 +3,7 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 const xFollowConfig = {
-  handle: "example_owner",
+  handle: "example_user",
   requiredField: "following",
   request: {
     url: "https://x.com/i/api/graphql/.*/UserByScreenName\\?.*",
@@ -56,9 +56,9 @@ async function main() {
         create: [
           {
             type: "X_FOLLOW",
-            title: "Follow @example_owner on X",
+            title: "Follow @example_user on X",
             description:
-              "Follow @example_owner on X. We verify the follow from your live X session.",
+              "Follow @example_user on X. We verify the follow from your live X session.",
             primusTemplateId: process.env.PRIMUS_TEMPLATE_X_FOLLOW || null,
             config: JSON.stringify(xFollowConfig),
             points: 100,

@@ -218,7 +218,7 @@ export async function POST(
   return complete(user.id, task, platform, identity, attestation, req);
 }
 
-/** Who completed the quest. Follow proofs attest the TARGET profile (e.g. Example), not the follower. */
+/** Who completed the quest. Follow proofs attest the target profile, not the follower. */
 function completerIdentity(
   taskType: string,
   user: {

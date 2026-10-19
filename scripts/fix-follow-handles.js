@@ -31,21 +31,17 @@ async function main() {
     const fromTitle = (task.title.match(/@([A-Za-z0-9_]+)/) || task.title.match(/\b([A-Za-z0-9_]{3,})\b/)) || [];
     let handle = (cfg.handle || "").replace(/^@/, "");
     const titleHint = (task.title.match(/@([A-Za-z0-9_]+)/) || [])[1];
-    if (titleHint && titleHint.toLowerCase() !== "example_owner") handle = titleHint;
-    if (/sample/i.test(task.title) && handle.toLowerCase() === "example_owner") {
-      handle = "example_user";
-    }
+    if (titleHint) handle = titleHint;
     if (!handle) continue;
     const next = followConfig(handle);
-    const clearTemplate = handle.toLowerCase() !== "example_owner";
     await p.task.update({
       where: { id: task.id },
       data: {
         config: JSON.stringify(next),
-        primusTemplateId: clearTemplate ? null : task.primusTemplateId,
+        primusTemplateId: task.primusTemplateId,
       },
     });
-    console.log("updated", task.id, "handle=", handle, "template=", clearTemplate ? "cleared" : "kept");
+    console.log("updated", task.id, "handle=", handle);
   }
 }
 

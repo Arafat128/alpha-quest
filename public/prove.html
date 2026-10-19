@@ -235,7 +235,7 @@
         }
         request.setAttMode({ algorithmType: "proxytls" });
         // Primus extension uses additionParams.launch_page as chrome.tabs.create
-        // URL, overriding Hub dataPageTemplate.baseUrl (otherwise always Example).
+        // URL, overriding Hub dataPageTemplate.baseUrl (otherwise the profile baked into the template).
         const extra = { taskId: taskId, userId: user.id, handle: handle };
         if (handle) extra.launch_page = "https://x.com/" + handle;
         request.setAdditionParams(JSON.stringify(extra));
