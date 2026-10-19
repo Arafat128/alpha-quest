@@ -1,7 +1,3 @@
-"use client";
-
-import { useEffect, useState } from "react";
-
 export default function HomeHero({
   campaigns,
   tasks,
@@ -9,42 +5,21 @@ export default function HomeHero({
   campaigns: number;
   tasks: number;
 }) {
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
-  const [name, setName] = useState("");
-
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((j) => {
-        setLoggedIn(Boolean(j.user));
-        setName(j.user?.displayName || "");
-      })
-      .catch(() => setLoggedIn(false));
-  }, []);
-
   return (
     <section className="hero">
       <div>
-        <p className="kicker">Primus zkTLS · no wallet</p>
+        <p className="kicker">Primus zkTLS · no account</p>
         <h1 className="display">
           Prove the action.
           <em> Keep the session yours.</em>
         </h1>
         <p className="hero-copy">
-          {loggedIn
-            ? `Signed in as ${name}. Open a campaign and verify tasks — X actions still use Primus zkTLS.`
-            : "Log in with Discord. Follows and posts are attested from your live browser session, not a checkbox."}
+          No login. Open a campaign and click a task. Primus zkTLS proves it from the X or Discord
+          session already open in this browser. {campaigns} campaigns, {tasks} tasks.
         </p>
-        {loggedIn === false && (
-          <a href="/login" className="btn-primary mt-8">
-            Log in with Discord
-          </a>
-        )}
-        {loggedIn === true && (
-          <a href="#campaigns" className="btn-primary mt-8">
-            Continue to campaigns
-          </a>
-        )}
+        <a href="#campaigns" className="btn-primary mt-8">
+          Try a proof
+        </a>
       </div>
       <aside className="slip" aria-label="How a proof works">
         <div className="slip-top">
@@ -55,7 +30,7 @@ export default function HomeHero({
         <ol>
           <li>
             <span>01</span>
-            Sign in with Discord
+            Open a campaign
           </li>
           <li>
             <span>02</span>

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import AuthBar from "./AuthBar";
 
 export default function Nav() {
   return (
@@ -13,8 +12,6 @@ export default function Nav() {
       <nav className="nav-links">
         <Link href="/">Campaigns</Link>
         <Link href="/leaderboard">Board</Link>
-        <Link href="/account">Account</Link>
-        <AuthBar />
       </nav>
     </header>
   );

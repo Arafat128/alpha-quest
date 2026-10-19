@@ -52,52 +52,17 @@ const VerifyButton = forwardRef<VerifyHandle, Props>(function VerifyButton(
     setBusy(true);
     setMsg("");
     try {
-      const meRes = await fetch("/api/auth/me");
-      const me = await meRes.json();
-      if (!me.user?.id) throw new Error("Log in with Discord first");
-
-      const norm = (s?: string | null) => (s || "").replace(/^@/, "").trim().toLowerCase();
-      if (
-        type === "X_FOLLOW" &&
-        norm(me.user.xHandle) &&
-        norm(config.handle) &&
-        norm(me.user.xHandle) === norm(config.handle)
-      ) {
-        const res = await fetch(`/api/tasks/${taskId}/verify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || "Verify failed");
-        onDone?.();
-        return;
-      }
-
-      if (type === "DISCORD_JOIN" || type === "DISCORD_ROLE") {
-        if (!me.user.discordId) {
-          window.location.href = "/api/auth/discord?intent=link";
-          throw new Error("Connect Discord first, then click the task again.");
-        }
-        await startPrimusProof({
-          taskId,
-          templateId: primusTemplateId,
-          taskType: type,
-          guildId: config.guildId,
-          user: { id: me.user.id, boundAddress: me.user.boundAddress },
-          onStatus: setMsg,
-        });
-        setMsg("");
-        onDone?.();
-        return;
-      }
+      const guestRes = await fetch("/api/auth/guest", { method: "POST" });
+      const guest = await guestRes.json();
+      if (!guest.user?.id) throw new Error("Could not start a proof session");
 
       await startPrimusProof({
         taskId,
         templateId: primusTemplateId,
         handle: type === "X_FOLLOW" ? config.handle : "",
         taskType: type,
-        user: { id: me.user.id, boundAddress: me.user.boundAddress },
+        guildId: config.guildId,
+        user: { id: guest.user.id, boundAddress: guest.user.boundAddress },
         onStatus: setMsg,
       });
       setMsg("");

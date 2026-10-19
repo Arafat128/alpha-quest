@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { awaitDb, prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/session";
+import { ensureGuest } from "@/lib/session";
 import {
   parseTaskConfig,
   defaultXFollowConfig,
@@ -18,8 +18,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   await awaitDb();
-  const { user } = await requireUser();
-  if (!user) return NextResponse.json({ error: "Log in with Discord first" }, { status: 401 });
+  const { user } = await ensureGuest();
 
   const task = await prisma.task.findUnique({ where: { id: params.id } });
   if (!task) return NextResponse.json({ error: "Unknown task" }, { status: 404 });

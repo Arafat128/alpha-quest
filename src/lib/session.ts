@@ -30,6 +30,19 @@ export async function getSession(): Promise<IronSession<SessionData>> {
   return getIronSession<SessionData>(cookies(), sessionOptions);
 }
 
+export async function ensureGuest() {
+  await awaitDb();
+  const session = await getSession();
+  if (session.userId) {
+    const existing = await prisma.user.findUnique({ where: { id: session.userId } });
+    if (existing) return { session, user: existing };
+  }
+  const user = await prisma.user.create({ data: {} });
+  session.userId = user.id;
+  await session.save();
+  return { session, user };
+}
+
 export async function requireUser() {
   await awaitDb();
   const session = await getSession();

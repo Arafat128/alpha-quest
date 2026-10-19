@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { awaitDb, prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/session";
+import { ensureGuest } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   getPrimusSigner,
@@ -35,8 +35,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   await awaitDb();
-  const { user } = await requireUser();
-  if (!user) return NextResponse.json({ error: "Log in with Discord first" }, { status: 401 });
+  const { user } = await ensureGuest();
 
   const limited = await rateLimit(`verify:${user.id}`, 12, 60_000);
   if (!limited.ok) {
@@ -142,9 +141,6 @@ export async function POST(
   const data = flattenAttestationData(attestation);
   const extras = (body?.extras && typeof body.extras === "object" ? body.extras : {}) as Record<string, unknown>;
   if (task.type === "DISCORD_JOIN" || task.type === "DISCORD_ROLE") {
-    if (!user.discordId) {
-      return NextResponse.json({ error: "Connect Discord on the Account page first" }, { status: 400 });
-    }
     const guildId = discordGuildId(config.guildId);
     if (!guildId) {
       return NextResponse.json({ error: "This quest has no Discord server configured" }, { status: 400 });
@@ -165,7 +161,7 @@ export async function POST(
         { status: 400 }
       );
     }
-    return complete(user.id, task, "discord", user.discordId, attestation, req);
+    return complete(user.id, task, "discord", user.discordId || user.id, attestation, req);
   }
 
   if (task.type === "X_FOLLOW") {

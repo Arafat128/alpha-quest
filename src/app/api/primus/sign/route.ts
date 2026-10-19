@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPrimusSigner } from "@/lib/primus";
-import { requireUser } from "@/lib/session";
+import { ensureGuest } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit";
 import { boundAddress } from "@/lib/identity";
 import { awaitDb, prisma } from "@/lib/prisma";
@@ -20,8 +20,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   await awaitDb();
-  const { user } = await requireUser();
-  if (!user) return NextResponse.json({ error: "Log in with Discord first" }, { status: 401 });
+  const { user } = await ensureGuest();
 
   const limited = await rateLimit(`sign:${user.id}`, 20, 60_000);
   if (!limited.ok) {

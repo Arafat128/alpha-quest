@@ -79,13 +79,10 @@ async function runBase(browser, base) {
     log((await page.getByText("Leaderboard").count()) > 0, host, "leaderboard", page.url());
 
     await page.goto(base + "/login", { waitUntil: "domcontentloaded" });
-    const x = page.getByRole("link", { name: /Continue with X/i });
-    const d = page.getByRole("link", { name: /Continue with Discord/i });
-    await d.waitFor({ state: "visible", timeout: 15000 });
-    log((await x.count()) === 0 && (await d.count()) >= 1, host, "login buttons", `x=${await x.count()} d=${await d.count()}`);
+    log(!page.url().includes("/login"), host, "login redirects home", page.url());
 
     await page.goto(base + "/account", { waitUntil: "domcontentloaded" });
-    log((await page.getByText("Account").count()) > 0, host, "account page", page.url());
+    log(!page.url().includes("/account"), host, "account redirects home", page.url());
 
     await page.goto(base + "/admin", { waitUntil: "domcontentloaded" });
     const pw = env.ADMIN_SECRET || "";
