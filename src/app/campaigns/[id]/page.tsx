@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import TaskCard, { type TaskView } from "@/components/TaskCard";
 import LocalTime from "@/components/LocalTime";
 
@@ -11,10 +11,13 @@ export default function CampaignPage({ params }: { params: { id: string } }) {
   const [error, setError] = useState("");
   const [endsAt, setEndsAt] = useState<string | null>(null);
   const [ended, setEnded] = useState(false);
+  const loadGen = useRef(0);
 
   const load = useCallback(async () => {
+    const gen = ++loadGen.current;
     const res = await fetch(`/api/campaigns/${params.id}/tasks`);
     const json = await res.json();
+    if (gen !== loadGen.current) return;
     if (!res.ok) {
       setError(json.error || "Failed to load");
       return;
@@ -51,7 +54,16 @@ export default function CampaignPage({ params }: { params: { id: string } }) {
       {error && <p className="note">{error}</p>}
       <div className="stack">
         {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} onDone={load} />
+          <TaskCard
+            key={task.id}
+            task={task}
+            onDone={() => {
+              setTasks((current) =>
+                current.map((item) => (item.id === task.id ? { ...item, status: "verified" } : item))
+              );
+              void load();
+            }}
+          />
         ))}
       </div>
     </div>

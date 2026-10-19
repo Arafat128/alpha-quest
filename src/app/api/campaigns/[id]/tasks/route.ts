@@ -21,6 +21,7 @@ export async function GET(
   const completions = user
     ? await prisma.taskCompletion.findMany({
         where: { userId: user.id, taskId: { in: campaign.tasks.map((t) => t.id) } },
+        select: { taskId: true },
       })
     : [];
   const done = new Set(completions.map((c) => c.taskId));
