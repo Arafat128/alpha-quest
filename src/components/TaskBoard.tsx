@@ -33,7 +33,7 @@ export default function TaskBoard() {
   return (
     <section id="proofs">
       <div className="section-head">
-        <h2>Try a proof</h2>
+        <h2>Proofs</h2>
         <span className="kicker" style={{ color: "var(--faint)" }}>
           {ready ? `${tasks.filter((task) => task.status === "verified").length} of ${tasks.length} done` : "Loading"}
         </span>

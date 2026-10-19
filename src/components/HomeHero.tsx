@@ -12,9 +12,6 @@ export default function HomeHero() {
           checks one live page in this browser and returns a proof of that fact. The password, the
           rest of the page, and everything you did not agree to show stay where they are.
         </p>
-        <a href="#proofs" className="btn-primary mt-8">
-          Try a proof
-        </a>
       </div>
       <aside className="slip" aria-label="How a proof works">
         <div className="slip-top">

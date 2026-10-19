@@ -4,7 +4,6 @@ import { Instrument_Serif } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import Providers from "./providers";
-import Nav from "@/components/Nav";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -38,12 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Script src="/primus_zk.js" strategy="beforeInteractive" />
         <Script src="/client_plugin.js" strategy="beforeInteractive" />
         <Providers>
-          <Nav />
           <main className="shell">{children}</main>
-          <footer className="site-foot">
-            <span>Alpha Quest</span>
-            <span>Session stays yours · Primus zkTLS</span>
-          </footer>
         </Providers>
       </body>
     </html>
