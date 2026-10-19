@@ -61,7 +61,16 @@ export default function CampaignPage({ params }: { params: { id: string } }) {
               setTasks((current) =>
                 current.map((item) => (item.id === task.id ? { ...item, status: "verified" } : item))
               );
+            }}
+            onSaved={() => {
               void load();
+            }}
+            onRevert={() => {
+              setTasks((current) =>
+                current.map((item) =>
+                  item.id === task.id && item.status === "verified" ? { ...item, status: "not_started" } : item
+                )
+              );
             }}
           />
         ))}

@@ -26,9 +26,13 @@ export type TaskView = {
 export default function TaskCard({
   task,
   onDone,
+  onSaved,
+  onRevert,
 }: {
   task: TaskView;
   onDone?: () => void;
+  onSaved?: () => void;
+  onRevert?: () => void;
 }) {
   const verifyRef = useRef<VerifyHandle>(null);
   const verified = task.status === "verified";
@@ -75,7 +79,14 @@ export default function TaskCard({
       </div>
       <div className="task-side">
         <p className="pts">{task.points} pts</p>
-        <VerifyButton ref={verifyRef} taskId={task.id} {...task} onDone={onDone} />
+        <VerifyButton
+          ref={verifyRef}
+          taskId={task.id}
+          {...task}
+          onDone={onDone}
+          onSaved={onSaved}
+          onRevert={onRevert}
+        />
       </div>
     </article>
   );

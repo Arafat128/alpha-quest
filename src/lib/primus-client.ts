@@ -111,6 +111,7 @@ export async function startPrimusProof(opts: {
   mode?: "account" | "proof";
   user: PrimusUser;
   onStatus?: (msg: string) => void;
+  onProofReady?: () => void;
 }): Promise<void | string> {
   const { taskId, user, onStatus } = opts;
   let handle = normalizeXHandle(opts.handle);
@@ -223,6 +224,7 @@ export async function startPrimusProof(opts: {
 
   const attestation = await zk.startAttestation(signed);
   if (!attestation) throw new Error("Empty proof");
+  opts.onProofReady?.();
 
   const extras: JsonRecord = {};
   try {

@@ -261,8 +261,8 @@ async function complete(
         pointsAwarded: task.points,
       },
     });
-    await logAudit({ userId, type: "VERIFY_OK", ip, detail: { taskId: task.id, platform } });
-    await recomputeRisk(userId);
+    void logAudit({ userId, type: "VERIFY_OK", ip, detail: { taskId: task.id, platform } });
+    void recomputeRisk(userId);
     return NextResponse.json({
       ok: true,
       pointsAwarded: row.pointsAwarded,

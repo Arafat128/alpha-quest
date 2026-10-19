@@ -21,6 +21,8 @@ type Props = {
     responseResolves?: ResponseResolve[];
   };
   onDone?: () => void;
+  onSaved?: () => void;
+  onRevert?: () => void;
 };
 
 export type VerifyHandle = {
@@ -38,7 +40,7 @@ function errorText(err: unknown) {
 }
 
 const VerifyButton = forwardRef<VerifyHandle, Props>(function VerifyButton(
-  { taskId, type, status, primusTemplateId, config, onDone },
+  { taskId, type, status, primusTemplateId, config, onDone, onSaved, onRevert },
   ref
 ) {
   const [busy, setBusy] = useState(false);
@@ -56,6 +58,7 @@ const VerifyButton = forwardRef<VerifyHandle, Props>(function VerifyButton(
       const guest = await guestRes.json();
       if (!guest.user?.id) throw new Error("Could not start a proof session");
 
+      let shown = false;
       await startPrimusProof({
         taskId,
         templateId: primusTemplateId,
@@ -64,16 +67,23 @@ const VerifyButton = forwardRef<VerifyHandle, Props>(function VerifyButton(
         guildId: config.guildId,
         user: { id: guest.user.id, boundAddress: guest.user.boundAddress },
         onStatus: setMsg,
+        onProofReady: () => {
+          shown = true;
+          setMsg("");
+          setBusy(false);
+          onDone?.();
+        },
       });
-      setMsg("");
-      onDone?.();
+      if (shown) onSaved?.();
+      else onDone?.();
     } catch (err) {
+      onRevert?.();
       setMsg(friendlyPrimusError(err) || errorText(err));
     } finally {
       running.current = false;
       setBusy(false);
     }
-  }, [config.guildId, config.handle, onDone, primusTemplateId, status, taskId, type]);
+  }, [config.guildId, config.handle, onDone, onRevert, onSaved, primusTemplateId, status, taskId, type]);
 
   useImperativeHandle(ref, () => ({ start: () => void start() }), [start]);
 
