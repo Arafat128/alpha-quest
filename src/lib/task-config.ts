@@ -211,6 +211,40 @@ export function swapScreenNameInUrl(url: string, handle: string): string {
   return USER_BY_SCREEN_NAME_REQUEST_PATTERN;
 }
 
+/** Numeric profile id on a UserOriginalsTimeline / UserTweets request, not a mentioned account. */
+export function xProfileUserIdFromUrl(url?: string | null): string | null {
+  if (!url) return null;
+  const read = (raw: string) => {
+    try {
+      const variables = JSON.parse(raw) as { userId?: string; user_id?: string };
+      const id = String(variables.userId || variables.user_id || "").trim();
+      if (/^\d{4,}$/.test(id)) return id;
+    } catch {
+      // ignore
+    }
+    return null;
+  };
+  try {
+    const parsed = new URL(url);
+    const raw = parsed.searchParams.get("variables");
+    if (raw) {
+      const id = read(raw);
+      if (id) return id;
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    const decoded = decodeURIComponent(url);
+    const match = decoded.match(/"userId"\s*:\s*"(\d+)"/);
+    if (match?.[1]) return match[1];
+  } catch {
+    // ignore
+  }
+  const encoded = String(url).match(/userId(?:%22|")\s*(?:%3A|:)\s*(?:%22|")(\d+)/i);
+  return encoded?.[1] || null;
+}
+
 export function xHandleFromRequestUrl(url?: string | null): string | null {
   if (!url) return null;
   try {

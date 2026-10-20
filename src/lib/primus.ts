@@ -1,7 +1,7 @@
 import { ethers } from "ethers";
 import { PrimusPageCoreTLS } from "@primuslabs/zktls-page-core-sdk";
 import { encodeAttestation } from "@primuslabs/zktls-page-core-sdk/dist/utils";
-import { xHandleFromRequestUrl } from "./task-config";
+import { xHandleFromRequestUrl, xProfileUserIdFromUrl } from "./task-config";
 export { defaultTemplateForTask } from "./task-config";
 
 // page-core-sdk 0.2.1 only trusts the first address. Current Primus production
@@ -178,6 +178,82 @@ export function extractIdentity(
     if (hit) return hit;
   }
   return null;
+}
+
+const POSTER_SKIP_KEYS = new Set(["user_mentions", "mentions"]);
+
+function attestationRequestUrl(attestation?: Record<string, unknown>): string | null {
+  if (!attestation) return null;
+  const request = attestation.request as { url?: string } | undefined;
+  const nested = (attestation.attRequest as { request?: { url?: string } } | undefined)?.request;
+  return request?.url || nested?.url || null;
+}
+
+function scoreOwnerPath(path: string): number {
+  const lower = path.toLowerCase();
+  if (lower.includes("user_mention")) return -1;
+  const inTimeline = lower.includes("timeline") || lower.includes("entries") || lower.includes("tweet");
+  if (!inTimeline && (lower.endsWith("core.screen_name") || lower.endsWith("legacy.screen_name") || lower.endsWith(".rest_id"))) {
+    return 100;
+  }
+  if (!inTimeline) return 80;
+  if (lower.includes("user_results")) return 40;
+  return 10;
+}
+
+function collectLeaf(
+  obj: unknown,
+  leaf: string,
+  path: string,
+  out: { path: string; value: string }[]
+) {
+  if (!obj || typeof obj !== "object") return;
+  if (Array.isArray(obj)) {
+    obj.forEach((item, index) => collectLeaf(item, leaf, `${path}[${index}]`, out));
+    return;
+  }
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    if (POSTER_SKIP_KEYS.has(key.toLowerCase())) continue;
+    const child = path ? `${path}.${key}` : key;
+    if (key.toLowerCase().split(".").pop() === leaf && typeof value === "string" && value) {
+      out.push({ path: child, value });
+    }
+    collectLeaf(value, leaf, child, out);
+  }
+}
+
+/**
+ * Who the mention proof belongs to. Prefer the timeline owner's id from the
+ * witnessed request. Never use a screen name that only appears as a mention.
+ */
+export function extractXPosterIdentity(
+  data: Record<string, unknown>,
+  attestation: Record<string, unknown> | undefined,
+  ignoreHandles: Array<string | null | undefined>
+): string | null {
+  const profileId = xProfileUserIdFromUrl(attestationRequestUrl(attestation));
+  if (profileId) return profileId;
+
+  const ignore = new Set(
+    ignoreHandles
+      .map((value) => (value || "").replace(/^@/, "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const names = [] as { path: string; value: string }[];
+  collectLeaf(data, "screen_name", "", names);
+  const ranked = names
+    .map((item) => ({ ...item, score: scoreOwnerPath(item.path) }))
+    .filter((item) => item.score >= 0 && !ignore.has(item.value.replace(/^@/, "").trim().toLowerCase()))
+    .sort((a, b) => b.score - a.score || a.path.length - b.path.length);
+  if (ranked[0]) return ranked[0].value.replace(/^@/, "").trim();
+
+  const restIds = [] as { path: string; value: string }[];
+  collectLeaf(data, "rest_id", "", restIds);
+  const ownerRest = restIds
+    .map((item) => ({ ...item, score: scoreOwnerPath(item.path) }))
+    .filter((item) => item.score >= 80 && /^\d+$/.test(item.value))
+    .sort((a, b) => b.score - a.score || a.path.length - b.path.length)[0];
+  return ownerRest?.value || null;
 }
 
 export function extractAttestedXHandle(

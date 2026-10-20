@@ -8,6 +8,7 @@ import {
   flattenAttestationData,
   followFlagFromProof,
   extractIdentity,
+  extractXPosterIdentity,
   extractAttestedXHandle,
   parseAdditionParams,
 } from "@/lib/primus";
@@ -213,7 +214,7 @@ export async function POST(
   }
 
   const platform = task.type.startsWith("DISCORD") ? "discord" : "x";
-  const identity = completerIdentity(task.type, user, data);
+  const identity = completerIdentity(task.type, user, data, attestation, config.mention);
 
   return complete(user.id, task, platform, identity, attestation, req);
 }
@@ -227,13 +228,20 @@ function completerIdentity(
     xHandle: string | null;
     discordId: string | null;
   },
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
+  attestation: Record<string, unknown>,
+  mention?: string | null
 ) {
   if (taskType === "X_FOLLOW") {
     return user.xUserId || user.xHandle || user.id;
   }
   if (taskType === "X_POST") {
-    return extractIdentity(data, "x") || user.xUserId || user.xHandle || user.id;
+    return (
+      extractXPosterIdentity(data, attestation, [mention]) ||
+      user.xUserId ||
+      user.xHandle ||
+      user.id
+    );
   }
   if (taskType.startsWith("DISCORD")) {
     return user.discordId || user.id;
@@ -276,13 +284,25 @@ async function complete(
       if (target.includes("userId")) {
         return NextResponse.json({ ok: true, already: true, pointsAwarded: task.points });
       }
-      await logAudit({
-        userId,
-        type: "SYBIL_BLOCK",
-        ip,
-        detail: { taskId: task.id, platform, identityHash },
+      // Same X account, new browser cookie. Keep the proof on the browser that just verified.
+      const moved = await prisma.taskCompletion.updateMany({
+        where: { taskId: task.id, provenIdentityHash: identityHash },
+        data: {
+          userId,
+          attestationHash: hashAttestation(attestation),
+          verifiedAt: new Date(),
+          pointsAwarded: task.points,
+        },
       });
-      await recomputeRisk(userId);
+      if (moved.count > 0) {
+        void logAudit({ userId, type: "VERIFY_OK", ip, detail: { taskId: task.id, platform, moved: true } });
+        void recomputeRisk(userId);
+        return NextResponse.json({
+          ok: true,
+          pointsAwarded: task.points,
+          verifiedAt: new Date().toISOString(),
+        });
+      }
       return NextResponse.json(
         { error: "This social identity already completed the task on another account" },
         { status: 409 }
